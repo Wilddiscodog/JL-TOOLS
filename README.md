@@ -39,7 +39,9 @@ TF:\
 
 ## 2. JlFlash — 烧录工具
 
-自研的杰理 USB 烧录器（Win10/11 x64，需 .NET 8 Runtime）：
+自研的杰理 USB 烧录器（Win10/11 x64，需 .NET 8 Runtime），含命令行与图形界面两个版本：
+
+### JlFlash（命令行版，`bin-release/`）
 
 - 自动识别 UDISK 模式 → 踢入 UBOOT → 擦写校验 → 复位，全流程一键完成
 - 支持读回芯片 ChipKey（eFuse）、Flash ID
@@ -52,6 +54,22 @@ dotnet JlFlash.exe            # 或直接双击 JlFlash.exe
 ```
 
 烧录时选择 `firmware/jl_isd.bin`，设备插 USB 后按提示操作即可。
+
+### JlFlashGui（图形界面版，`JlFlashGui/bin-release/`）
+
+带窗口的操作界面，功能分区：
+
+- **设备区**：扫描/踢 UBOOT 设备、显示设备信息
+- **AC695N SRAM 运行区**：加载 payload 到指定 RAM 地址运行
+  （地址/邮箱/参数/加密方式可选），用于裸机调试与loader实验
+- **固件烧录区**：选择固件文件一键烧录 AC695N Flash
+
+使用方法：
+
+```
+cd JlFlash/JlFlashGui/bin-release
+JlFlashGui.exe                # 直接双击
+```
 
 ## 3. chip-manual — 芯片参考手册
 

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <AssemblyName>JlFlashGui</AssemblyName>
+    <RootNamespace>JlFlashGui</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <ApplicationHighDpiMode>SystemAware</ApplicationHighDpiMode>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\JlFlash\Protocol\**\*.cs" Link="Protocol\%(Filename)%(Extension)" />
+    <Compile Include="..\JlFlash\Transport\**\*.cs" Link="Transport\%(Filename)%(Extension)" />
+    <Compile Include="..\JlFlash\Flow\**\*.cs" Link="Flow\%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>
