@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>USB 设备控制器 — AC6956C 参考手册</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<nav class="topbar"><div class="topbar-inner">
+  <a class="brand" href="index.html">
+    <span class="logo">AC6956C<em>·BR23</em></span>
+    <span class="sub">芯片参考手册</span>
+  </a>
+  <div class="navlinks"><a href="index.html">芯片总览</a><a href="clock.html">时钟系统</a><a href="gpio.html">GPIO 与 IO 复用</a><a href="irq.html">中断系统</a><a href="uart.html">UART 串口</a><a href="spi.html">SPI 总线</a><a href="iic.html">IIC 总线</a><a href="timer.html">定时器</a><a href="mcpwm.html">MCPWM</a><a href="adc.html">ADC 采样</a><a href="audio.html">音频系统</a><a href="usb.html" class=active>USB 设备</a><a href="sdio.html">SD / TF 卡</a><a href="sfc.html">SPI Flash 控制器</a><a href="power.html">电源管理</a><a href="dma-sec.html">DMA 与安全加速器</a><a href="misc.html">其他外设</a></div>
+</div></nav>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="crumb">CHAPTER 12</div>
+    <h1>USB 设备控制器</h1>
+    <p>Full-Speed 设备 + OTG：SIE/PHY 控制、5 组端点 DMA 与 UTMI 索引寄存器——对应 JL_USB（0x1E1800）、JL_USB_IO（0x1E5100）。</p>
+  </header>
+
+  <div class="layout">
+    <main class="main">
+<section class="card" id="ov">
+<h2 id="ov">概述</h2>
+
+<p>USB <b>Full-Speed 设备控制器</b>（12 Mbps）+ OTG 检测：1 个控制端点 EP0 +
+4 组双向数据端点。FIFO 大小按类配置（SDK 默认：EP0/HID/MSD 64B、CDC 128B、
+AUDIO 256B）。设备控制器包含一套 <b>UTMI 风格的索引寄存器</b>
+（FADDR/INDEX/TXCSR…），经 CON1 的主机访问接口读写。</p>
+<div class="grid g4"><div class="kpi"><div class="v">FS 12M</div><div class="k">Full-Speed</div></div><div class="kpi"><div class="v">EP0-4</div><div class="k">1 控制 + 4 数据</div></div><div class="kpi"><div class="v">HID/CDC/MSC/AUDIO</div><div class="k">SDK 内置类驱动</div></div><div class="kpi"><div class="v">IRQ 8/9</div><div class="k">SOF / 控制+数据</div></div></div>
+
+<div class="fig"><svg viewBox="0 0 900 340" xmlns="http://www.w3.org/2000/svg" role="img"><defs><marker id="arw" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#5b6b8c"/></marker></defs><rect x="30" y="60" width="190" height="80" rx="9" fill="#dbe4f5" stroke="#14264d" stroke-width="1.4"/><text x="125.0" y="80.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="800" fill="#14264d">DP / DM 引脚</text><text x="125.0" y="96.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">USB_IO CON0：</text><text x="125.0" y="112.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">上下拉、输出、中断</text><text x="125.0" y="128.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">（与 UART0 复用）</text><rect x="320" y="40" width="200" height="120" rx="9" fill="#e8eefc" stroke="#2456d6" stroke-width="1.4"/><text x="420.0" y="71.375" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12.5" font-weight="800" fill="#14264d">USB SIE</text><text x="420.0" y="87.875" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">CON0：PHY/SIE 中断</text><text x="420.0" y="104.375" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">SOF / SIE pending</text><text x="420.0" y="120.875" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">INDEX 选端点</text><text x="420.0" y="137.375" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">UTMI 级寄存器</text><rect x="620" y="30" width="220" height="70" rx="9" fill="#e6f5ec" stroke="#1e7f4f" stroke-width="1.4"/><text x="730.0" y="61.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="800" fill="#14264d">EP0 控制</text><text x="730.0" y="77.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">8B 描述符 / EP0_CNT</text><rect x="620" y="130" width="220" height="90" rx="9" fill="#e6f5ec" stroke="#1e7f4f" stroke-width="1.4"/><text x="730.0" y="155.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="800" fill="#14264d">EP1-4 数据端点</text><text x="730.0" y="171.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">EPx_TADR / EPx_RADR</text><text x="730.0" y="187.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">EPx_CNT（双向）</text><text x="730.0" y="203.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">FIFO 64-256B</text><rect x="320" y="230" width="200" height="70" rx="9" fill="#eef1f7" stroke="#8a94a6" stroke-width="1.4"/><text x="420.0" y="253.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="800" fill="#14264d">OTG 检测</text><text x="420.0" y="269.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">otg_dev_data</text><text x="420.0" y="285.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">usb_dev_en</text><line x1="220" y1="100" x2="320" y2="100" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><line x1="520" y1="75" x2="620" y2="65" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><line x1="520" y1="110" x2="620" y2="160" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><line x1="420" y1="160" x2="420" y2="230" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/></svg><div class="figcap">图 12-1  USB 控制器结构</div></div>
+
+
+</section>
+<section class="card" id="regs">
+<h2 id="regs">寄存器</h2>
+<div class="tbl-wrap"><table class="tbl "><thead><tr><th>偏移</th><th>寄存器</th><th>属性</th><th>说明</th></tr></thead><tbody>
+<tr><td><code class="rg">0x00</code></td><td><code class="rg">USB CON0</code></td><td><span class="rw rw">RW</span></td><td>PHY/中断/pending（位见下）</td></tr>
+<tr><td><code class="rg">0x04</code></td><td><code class="rg">USB CON1</code></td><td><span class="rw rw">RW</span></td><td>UTMI 索引访问（MACK 触发/RNW）</td></tr>
+<tr><td><code class="rg">0x08</code></td><td><code class="rg">EP0_CNT</code></td><td><span class="rw wo">WO</span></td><td>EP0 字节计数</td></tr>
+<tr><td><code class="rg">0x0C</code></td><td><code class="rg">EP1-4_CNT</code></td><td><span class="rw wo">WO</span></td><td>各端点计数（每端点 1 个）</td></tr>
+<tr><td><code class="rg">0x1C</code></td><td><code class="rg">EP0_ADR</code></td><td><span class="rw wo">WO</span></td><td>EP0 DMA 地址</td></tr>
+<tr><td><code class="rg">0x20</code></td><td><code class="rg">EP1-4_TADR/RADR</code></td><td><span class="rw wo">WO</span></td><td>各端点收/发 DMA 地址</td></tr>
+</tbody></table></div>
+
+</section>
+<section class="card" id="con0">
+<h2 id="con0">CON0 位名（usb.h，JL_USB @ 0x1E1800）</h2>
+<div class="tbl-wrap"><table class="tbl "><thead><tr><th>位域</th><th>名称</th><th>说明</th></tr></thead><tbody>
+<tr><td><span class="bits-chip">[0]</span></td><td><code class='rg'>PHY_ON</code></td><td>PHY 上电</td></tr>
+<tr><td><span class="bits-chip">[1]</span></td><td><code class='rg'>LOW_SPEED</code></td><td>低速模式</td></tr>
+<tr><td><span class="bits-chip">[2]</span></td><td><code class='rg'>USB_NRST</code></td><td>IP 复位</td></tr>
+<tr><td><span class="bits-chip">[4]</span></td><td><code class='rg'>CID</code></td><td>OTG 角色</td></tr>
+<tr><td><span class="bits-chip">[5]</span></td><td><code class='rg'>VBUS</code></td><td>（读）VBUS 状态</td></tr>
+<tr><td><span class="bits-chip">[9]</span></td><td><code class='rg'>PDCHKDP</code></td><td>DP 检测使能</td></tr>
+<tr><td><span class="bits-chip">[10]</span></td><td><code class='rg'>SOFIE</code></td><td>SOF 中断使能</td></tr>
+<tr><td><span class="bits-chip">[11]</span></td><td><code class='rg'>SIEIE</code></td><td>SIE 中断使能</td></tr>
+<tr><td><span class="bits-chip">[12]</span></td><td><code class='rg'>CLR_SOF_PND</code></td><td>清 SOF pending</td></tr>
+<tr><td><span class="bits-chip">[13]</span></td><td><code class='rg'>SOF_PND</code></td><td>（读）SOF 标志</td></tr>
+<tr><td><span class="bits-chip">[14]</span></td><td><code class='rg'>SIE_PND</code></td><td>（读）SIE 标志</td></tr>
+<tr><td><span class="bits-chip">[15]</span></td><td><code class='rg'>CHKDPO</code></td><td>DP 检查</td></tr>
+<tr><td><span class="bits-chip">[17:16]</span></td><td><code class='rg'>DP_SE / DM_SE</code></td><td>DP/DM 单端检测</td></tr>
+</tbody></table></div>
+
+</section>
+<section class="card" id="utmi">
+<h2 id="utmi">UTMI 索引寄存器（经 INDEX 选择端点）</h2>
+<div class="tbl-wrap"><table class="tbl "><thead><tr><th>偏移</th><th>寄存器</th><th>说明</th></tr></thead><tbody>
+<tr><td>0x00</td><td>FADDR</td><td>设备地址</td></tr>
+<tr><td>0x01</td><td>POWER</td><td>电源/挂起/复位</td></tr>
+<tr><td>0x02-0x0B</td><td>INTRTX/RX/USB 及使能</td><td>中断状态与使能</td></tr>
+<tr><td>0x0C</td><td>FRAME1/2</td><td>帧号</td></tr>
+<tr><td>0x0E</td><td>INDEX</td><td>选择当前端点</td></tr>
+<tr><td>0x0F</td><td>DEVCTL</td><td>设备控制</td></tr>
+<tr><td>0x10-0x1B</td><td>TXMAXP/CSR/RXMAXP/CSR/COUNT/TYPE/INTERVAL</td><td>端点配置与状态</td></tr>
+</tbody></table></div>
+
+</section>
+<section class="card" id="use">
+<h2 id="use">使用方法</h2>
+<pre><code>/* SDK 场景化封装（通常无需碰寄存器） */
+#include &quot;device/usb/otg.h&quot;
+
+/* OTG 数据（board 板级） */
+struct otg_dev_data otg_data = {
+    .usb_dev_en = 1,             /* 作 USB 设备 */
+};
+
+/* 本机实践：日志模式下置 usb_dev_en=0，
+   OTG 检测被禁用，DP/DM 保持 UART0 功能 */
+otg_data.usb_dev_en = 0;
+
+/* MSD 升级通道：接电脑后 UDISK 模式被 JlFlash 用于烧录 */</code></pre>
+
+</section>
+<div class="warn">DP/DM 同时是 UART0 调试口的引脚——USB 枚举期间控制台会失效；需要全程日志时必须禁用 OTG（见上）。</div>
+
+      <div class="footer">
+        <a href="audio.html">← 音频系统</a>
+        <span class="src">依据 SDK 头文件逆向整理 · JieLi AC6956C (BR23) · 仅供开发参考</span>
+        <a href="sdio.html">SD / TF 卡 →</a>
+      </div>
+    </main>
+    <aside class="toc"><div class="t">本页目录</div><a href="#ov">概述</a><a href="#regs">寄存器</a><a href="#con0">CON0 位名（usb.h，JL_USB @ 0x1E1800）</a><a href="#utmi">UTMI 索引寄存器（经 INDEX 选择端点）</a><a href="#use">使用方法</a></aside>
+  </div>
+</div>
+</body>
+</html>

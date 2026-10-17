@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DMA 与安全加速器 — AC6956C 参考手册</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<nav class="topbar"><div class="topbar-inner">
+  <a class="brand" href="index.html">
+    <span class="logo">AC6956C<em>·BR23</em></span>
+    <span class="sub">芯片参考手册</span>
+  </a>
+  <div class="navlinks"><a href="index.html">芯片总览</a><a href="clock.html">时钟系统</a><a href="gpio.html">GPIO 与 IO 复用</a><a href="irq.html">中断系统</a><a href="uart.html">UART 串口</a><a href="spi.html">SPI 总线</a><a href="iic.html">IIC 总线</a><a href="timer.html">定时器</a><a href="mcpwm.html">MCPWM</a><a href="adc.html">ADC 采样</a><a href="audio.html">音频系统</a><a href="usb.html">USB 设备</a><a href="sdio.html">SD / TF 卡</a><a href="sfc.html">SPI Flash 控制器</a><a href="power.html">电源管理</a><a href="dma-sec.html" class=active>DMA 与安全加速器</a><a href="misc.html">其他外设</a></div>
+</div></nav>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="crumb">CHAPTER 16</div>
+    <h1>DMA 与安全加速器</h1>
+    <p>系统 DMA、硬件 CRC16、AES-GCM、真随机数与外设流加密——对应 JL_DMA / CRC / AES / RAND / PERIENC / DCP。</p>
+  </header>
+
+  <div class="layout">
+    <main class="main">
+<section class="card" id="dma">
+<h2 id="dma">系统 DMA（JL_DMA @ 0x1E3F00）</h2>
+
+<p>总线级 DMA 控制器，各外设（UART/SPI/SD/AUDIO…）的 DMA 请求经它仲裁。
+多数场景由外设自身的 DMA 描述符完成（如 UART 环形缓冲），此控制器用于
+存储器间搬运配置。</p>
+<div class="tbl-wrap"><table class="tbl "><thead><tr><th>偏移</th><th>寄存器</th><th>属性</th><th>说明</th></tr></thead><tbody>
+<tr><td><code class="rg">0x00</code></td><td><code class="rg">PRI0-3</code></td><td><span class="rw rw">RW</span></td><td>通道优先级</td></tr>
+<tr><td><code class="rg">0x20</code></td><td><code class="rg">MSG</code></td><td><span class="rw rw">RW</span></td><td>消息/触发</td></tr>
+<tr><td><code class="rg">0x24</code></td><td><code class="rg">MSG_CH</code></td><td><span class="rw ro">RO</span></td><td>（读）当前通道</td></tr>
+<tr><td><code class="rg">0x28</code></td><td><code class="rg">RDL / RDH</code></td><td><span class="rw rw">RW</span></td><td>读地址低/高</td></tr>
+<tr><td><code class="rg">0x30</code></td><td><code class="rg">WRL / WRH</code></td><td><span class="rw rw">RW</span></td><td>写地址低/高</td></tr>
+</tbody></table></div>
+
+
+</section>
+<section class="card" id="crc">
+<h2 id="crc">CRC16 加速（JL_CRC @ 0x1E3500）</h2>
+
+<p>硬件 CRC16 计算：向 FIFO 连续写入数据，结果存于 REG。SDK 封装为
+<code>CRC16(ptr, len)</code>，用于镜像校验（打包产物头部 CRC）与通信校验。</p>
+<div class="tbl-wrap"><table class="tbl "><thead><tr><th>偏移</th><th>寄存器</th><th>属性</th><th>说明</th></tr></thead><tbody>
+<tr><td><code class="rg">0x00</code></td><td><code class="rg">FIFO</code></td><td><span class="rw wo">WO</span></td><td>数据入口（写即计算）</td></tr>
+<tr><td><code class="rg">0x04</code></td><td><code class="rg">REG</code></td><td><span class="rw rw">RW</span></td><td>CRC 结果 / 初值</td></tr>
+</tbody></table></div>
+
+<pre><code>#include &quot;asm/crc16.h&quot;
+u16 c = CRC16(buf, len);                 /* 一步计算 */
+u16 c2 = CRC16_with_initval(buf, len, 0xFFFF);
+spi_crc16_set(init);                     /* 手动预置（连续分段计算） */
+u16 v = spi_crc16_get();</code></pre>
+
+
+</section>
+<section class="card" id="aes">
+<h2 id="aes">AES 加速（JL_AES @ 0x1E4300）</h2>
+
+<p>AES 引擎，寄存器含 NONCE/HEADER/TAGLEN/TAGRES——支持 <b>AES-GCM</b>
+（带认证标签）及常规模式，源/目的地址为总线 DMA。蓝牙加密与固件校验使用。</p>
+<div class="tbl-wrap"><table class="tbl "><thead><tr><th>偏移</th><th>寄存器</th><th>属性</th><th>说明</th></tr></thead><tbody>
+<tr><td><code class="rg">0x00</code></td><td><code class="rg">CON</code></td><td><span class="rw rw">RW</span></td><td>模式/启动</td></tr>
+<tr><td><code class="rg">0x04</code></td><td><code class="rg">DATIN</code></td><td><span class="rw rw">RW</span></td><td>输入数据</td></tr>
+<tr><td><code class="rg">0x08</code></td><td><code class="rg">KEY</code></td><td><span class="rw wo">WO</span></td><td>密钥</td></tr>
+<tr><td><code class="rg">0x0C</code></td><td><code class="rg">ENCRES0-3</code></td><td><span class="rw rw">RW</span></td><td>结果寄存器</td></tr>
+<tr><td><code class="rg">0x1C</code></td><td><code class="rg">NONCE</code></td><td><span class="rw wo">WO</span></td><td>GCM nonce</td></tr>
+<tr><td><code class="rg">0x20</code></td><td><code class="rg">HEADER</code></td><td><span class="rw wo">WO</span></td><td>GCM AAD</td></tr>
+<tr><td><code class="rg">0x24</code></td><td><code class="rg">SRCADR / DSTADR</code></td><td><span class="rw wo">WO</span></td><td>DMA 源/目的</td></tr>
+<tr><td><code class="rg">0x2C</code></td><td><code class="rg">CTCNT</code></td><td><span class="rw wo">WO</span></td><td>计数</td></tr>
+<tr><td><code class="rg">0x30</code></td><td><code class="rg">TAGLEN</code></td><td><span class="rw wo">WO</span></td><td>标签长度</td></tr>
+<tr><td><code class="rg">0x34</code></td><td><code class="rg">TAGRES0-3</code></td><td><span class="rw ro">RO</span></td><td>认证标签结果</td></tr>
+</tbody></table></div>
+
+
+</section>
+<section class="card" id="rand">
+<h2 id="rand">真随机数 / 外设流加密</h2>
+<ul><li><b>JL_RAND @ 0x1E3B00</b>：<code>R64L/R64H</code>（RO）读出 64 位真随机数，蓝牙地址/密钥熵源。</li><li><b>JL_PERIENC @ 0x1E4100</b>：SPI0/SD0 数据流加密（ENCCON/ENCKEY/ENCADR），TF 卡加密读写场景。</li><li><b>JL_DCP @ 0x1F1300</b>（HSB）：数据拷贝加速器（CON/ADR，IRQ 48），大块 memcpy 卸载。</li></ul>
+
+</section>
+<div class="tip">这些加速器 SDK 都有高层封装（crc16.h / crypto 库），仅在极限优化时才需要寄存器级操作；AES-GCM 的密钥调度请信任 SDK 实现。</div>
+
+      <div class="footer">
+        <a href="power.html">← 电源管理</a>
+        <span class="src">依据 SDK 头文件逆向整理 · JieLi AC6956C (BR23) · 仅供开发参考</span>
+        <a href="misc.html">其他外设 →</a>
+      </div>
+    </main>
+    <aside class="toc"><div class="t">本页目录</div><a href="#dma">系统 DMA（JL_DMA @ 0x1E3F00）</a><a href="#crc">CRC16 加速（JL_CRC @ 0x1E3500）</a><a href="#aes">AES 加速（JL_AES @ 0x1E4300）</a><a href="#rand">真随机数 / 外设流加密</a></aside>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GPIO 与 IO 复用 — AC6956C 参考手册</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<nav class="topbar"><div class="topbar-inner">
+  <a class="brand" href="index.html">
+    <span class="logo">AC6956C<em>·BR23</em></span>
+    <span class="sub">芯片参考手册</span>
+  </a>
+  <div class="navlinks"><a href="index.html">芯片总览</a><a href="clock.html">时钟系统</a><a href="gpio.html" class=active>GPIO 与 IO 复用</a><a href="irq.html">中断系统</a><a href="uart.html">UART 串口</a><a href="spi.html">SPI 总线</a><a href="iic.html">IIC 总线</a><a href="timer.html">定时器</a><a href="mcpwm.html">MCPWM</a><a href="adc.html">ADC 采样</a><a href="audio.html">音频系统</a><a href="usb.html">USB 设备</a><a href="sdio.html">SD / TF 卡</a><a href="sfc.html">SPI Flash 控制器</a><a href="power.html">电源管理</a><a href="dma-sec.html">DMA 与安全加速器</a><a href="misc.html">其他外设</a></div>
+</div></nav>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="crumb">CHAPTER 3</div>
+    <h1>GPIO 与 IO 复用</h1>
+    <p>4 组 56 个 GPIO：方向/上下拉/驱动能力寄存器、数字输入使能、IOMAP 输出通道路由、ADC 模拟复用与唤醒——对应 JL_PORTA-D / IOMAP / WAKEUP。</p>
+  </header>
+
+  <div class="layout">
+    <main class="main">
+<section class="card" id="model">
+<h2 id="model">GPIO 模型</h2>
+
+<p>AC6956C 提供 <b>PA0-PA15 / PB0-PB15 / PC0-PC15 / PD0-PD7</b> 共 56 个 GPIO，
+4 个端口组寄存器连续排列（每组 0x40 字节），每一位对应一个引脚。</p>
+<div class="fig"><svg viewBox="0 0 900 380" xmlns="http://www.w3.org/2000/svg" role="img"><defs><marker id="arw" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#5b6b8c"/></marker></defs><rect x="30" y="30" width="180" height="300" rx="9" fill="#eef1f7" stroke="#8a94a6" stroke-width="1.4"/><text x="120.0" y="108.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="13" font-weight="800" fill="#14264d">端口寄存器</text><text x="120.0" y="125.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">OUT   0x00</text><text x="120.0" y="142.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">IN    0x04</text><text x="120.0" y="159.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">DIR   0x08</text><text x="120.0" y="176.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">DIE   0x0C</text><text x="120.0" y="193.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">PU    0x10</text><text x="120.0" y="210.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">PD    0x14</text><text x="120.0" y="227.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">HD0   0x18</text><text x="120.0" y="244.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">HD    0x1C</text><text x="120.0" y="261.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">DIEH  0x20</text><rect x="330" y="40" width="180" height="70" rx="9" fill="#e6f5ec" stroke="#1e7f4f" stroke-width="1.4"/><text x="420.0" y="71.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="13" font-weight="800" fill="#14264d">输出驱动</text><text x="420.0" y="88.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">OUT + DIR</text><rect x="330" y="140" width="180" height="70" rx="9" fill="#e6f5ec" stroke="#1e7f4f" stroke-width="1.4"/><text x="420.0" y="171.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="13" font-weight="800" fill="#14264d">输入缓冲</text><text x="420.0" y="188.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">IN + DIE(输入使能)</text><rect x="330" y="240" width="180" height="70" rx="9" fill="#e6f5ec" stroke="#1e7f4f" stroke-width="1.4"/><text x="420.0" y="271.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="13" font-weight="800" fill="#14264d">上下拉 / 驱动</text><text x="420.0" y="288.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">PU / PD / HD0 / HD</text><rect x="640" y="130" width="200" height="90" rx="9" fill="#dbe4f5" stroke="#14264d" stroke-width="1.4"/><text x="740.0" y="162.55" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="13" font-weight="800" fill="#14264d">引脚 PAD</text><text x="740.0" y="179.55" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">PA0-15 / PB0-15</text><text x="740.0" y="196.55" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">PC0-15 / PD0-7</text><line x1="210" y1="75" x2="330" y2="75" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><line x1="210" y1="175" x2="330" y2="175" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><line x1="210" y1="275" x2="330" y2="275" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><line x1="510" y1="75" x2="640" y2="155" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><line x1="640" y1="175" x2="510" y2="175" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><line x1="510" y1="275" x2="640" y2="195" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/></svg><div class="figcap">图 3-1  端口寄存器模型（每位对应一个引脚）</div></div>
+
+<div class="note">输入缓冲由 <b>DIE</b> 位单独控制（数字输入使能）；读 IN 前必须置 DIE=1。
+模拟功能（ADC/触摸）引脚需 DIE=0 以降低数字干扰。</div>
+
+</section>
+<section class="card" id="regs">
+<h2 id="regs">寄存器（JL_PORTA @ 0x1E5000，B/C/D 依次 +0x40）</h2>
+<div class="tbl-wrap"><table class="tbl "><thead><tr><th>偏移</th><th>寄存器</th><th>属性</th><th>说明</th></tr></thead><tbody>
+<tr><td><code class="rg">0x00</code></td><td><code class="rg">OUT</code></td><td><span class="rw rw">RW</span></td><td>输出数据。DIR=1 时引脚电平 = OUT 位</td></tr>
+<tr><td><code class="rg">0x04</code></td><td><code class="rg">IN</code></td><td><span class="rw ro">RO</span></td><td>输入数据（需先置 DIE）</td></tr>
+<tr><td><code class="rg">0x08</code></td><td><code class="rg">DIR</code></td><td><span class="rw rw">RW</span></td><td>方向：1=输出，0=输入</td></tr>
+<tr><td><code class="rg">0x0C</code></td><td><code class="rg">DIE</code></td><td><span class="rw rw">RW</span></td><td>数字输入使能</td></tr>
+<tr><td><code class="rg">0x10</code></td><td><code class="rg">PU</code></td><td><span class="rw rw">RW</span></td><td>内部上拉使能</td></tr>
+<tr><td><code class="rg">0x14</code></td><td><code class="rg">PD</code></td><td><span class="rw rw">RW</span></td><td>内部下拉使能</td></tr>
+<tr><td><code class="rg">0x18</code></td><td><code class="rg">HD0</code></td><td><span class="rw rw">RW</span></td><td>驱动能力 0 档</td></tr>
+<tr><td><code class="rg">0x1C</code></td><td><code class="rg">HD</code></td><td><span class="rw rw">RW</span></td><td>驱动能力（大电流档）</td></tr>
+<tr><td><code class="rg">0x20</code></td><td><code class="rg">DIEH</code></td><td><span class="rw rw">RW</span></td><td>输入使能扩展（高速档）</td></tr>
+</tbody></table></div>
+
+</section>
+<section class="card" id="mux">
+<h2 id="mux">IO 复用与输出通道映射</h2>
+
+<p>外设信号到引脚没有传统"复用选择器"，而是通过 <b>IOMAP 输出通道</b>路由：
+内部信号（UART TX、PWM、时钟输出等）进入 CH0/CH1/CH2 三个输出通道（各 16 选 1），
+再绑定到任意被使能为输出的引脚。</p>
+<div class="fig"><svg viewBox="0 0 900 300" xmlns="http://www.w3.org/2000/svg" role="img"><defs><marker id="arw" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#5b6b8c"/></marker></defs><rect x="20" y="110" width="170" height="60" rx="9" fill="#e6f5ec" stroke="#1e7f4f" stroke-width="1.4"/><text x="105.0" y="136.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="800" fill="#14264d">内部信号</text><text x="105.0" y="152.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">UART_TX / PWM / CLK…</text><rect x="280" y="40" width="160" height="56" rx="9" fill="#eef1f7" stroke="#8a94a6" stroke-width="1.4"/><text x="360.0" y="64.125" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12.5" font-weight="800" fill="#14264d">输出通道 CH0</text><text x="360.0" y="80.625" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">IOMAP</text><rect x="280" y="180" width="160" height="56" rx="9" fill="#eef1f7" stroke="#8a94a6" stroke-width="1.4"/><text x="360.0" y="204.125" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12.5" font-weight="800" fill="#14264d">输出通道 CH1</text><text x="360.0" y="220.625" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">IOMAP</text><rect x="540" y="40" width="150" height="56" rx="9" fill="#e6f5ec" stroke="#1e7f4f" stroke-width="1.4"/><text x="615.0" y="64.125" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12.5" font-weight="800" fill="#14264d">任意引脚</text><text x="615.0" y="80.625" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">（输出使能）</text><rect x="540" y="180" width="150" height="56" rx="9" fill="#e6f5ec" stroke="#1e7f4f" stroke-width="1.4"/><text x="615.0" y="204.125" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12.5" font-weight="800" fill="#14264d">任意引脚</text><text x="615.0" y="220.625" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">（输出使能）</text><line x1="190" y1="140" x2="280" y2="68" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><line x1="190" y1="140" x2="280" y2="208" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><line x1="440" y1="68" x2="540" y2="68" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><line x1="440" y1="208" x2="540" y2="208" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/></svg><div class="figcap">图 3-2  输出通道路由（CH0-CH2 → 任意引脚）</div></div>
+
+<div class="tbl-wrap"><table class="tbl "><thead><tr><th>通道</th><th>可选内部信号（gpio.h 枚举）</th></tr></thead><tbody>
+<tr><td><code>CH0</code></td><td><code>UT0_TX UT1_TX T0_PWM_OUT T1_PWM_OUT RTOSH_CLK BTOSC_CLK PLL_12M UT2_TX CH0-2_PWM_H/L WLC_BT_FREQ T3_PWM_OUT</code></td></tr>
+<tr><td><code>CH1</code></td><td><code>UT0_TX UT1_TX T0_PWM_OUT WLC_BT_PRO RTOSL_CLK BTOSC_CLK SPDIF_DO UT2_TX CH0-2_PWM_H/L T2_PWM_OUT T3_PWM_OUT</code></td></tr>
+<tr><td><code>CH2</code></td><td><code>UT1_RTS UT1_TX WLC_BT_ACTIVE T1_PWM_OUT PLNK_SCLK BTOSC_CLK PLL_24M UT2_TX CH0-2_PWM_H/L T2_PWM_OUT T3_PWM_OUT</code></td></tr>
+</tbody></table></div>
+
+<p>时钟输出可直接经 CLK_CON0 固定路由到 <b>PA0</b> 与 <b>PB8</b>（见时钟章节）。</p>
+
+</section>
+<section class="card" id="ad">
+<h2 id="ad">模拟复用（ADC 通道）</h2>
+<div class="tbl-wrap"><table class="tbl "><thead><tr><th>通道宏</th><th>引脚/信号</th></tr></thead><tbody>
+<tr><td><code>AD_CH_PA1 / PA5 / PA6 / PA10 / PA12</code></td><td>PA 组模拟引脚</td></tr>
+<tr><td><code>AD_CH_PB1 / PB3 / PB4 / PB8 / PB10</code></td><td>PB 组模拟引脚（PB1 = AD 按键常用）</td></tr>
+<tr><td><code>AD_CH_PC4 / PC5 / PC6</code></td><td>PC 组模拟引脚</td></tr>
+<tr><td><code>AD_CH_DP</code></td><td>USB DP（可做 ADC）</td></tr>
+<tr><td><code>AD_CH_RTC</code></td><td>RTC 域信号</td></tr>
+<tr><td><code>AD_CH_PMU_*</code></td><td>内部：VBAT(÷4)、LDO5V(÷4)、VDC13、DTEMP、BG 基准…</td></tr>
+</tbody></table></div>
+
+</section>
+<section class="card" id="use">
+<h2 id="use">使用方法</h2>
+<pre><code>#include &quot;asm/gpio.h&quot;
+
+/* 输出：POW_FLS 按键电源轨（本机实例） */
+gpio_direction_output(IO_PORTB_11, 1);      /* 方向输出 + 输出 1 */
+
+/* 输入 + 上拉（AD 按键） */
+gpio_set_direction(IO_PORTB_01, 0);         /* 0 = 输入 */
+gpio_set_pull_up(IO_PORTB_01, 1);           /* 22K 上拉（外部） */
+gpio_set_die(IO_PORTB_01, 1);               /* 打开数字输入（读 IN 必需） */
+int v = gpio_read(IO_PORTB_01);
+
+/* 直接写端口寄存器（位操作） */
+JL_PORTB-&gt;OUT |=  BIT(11);   /* PB11 = 1 */
+JL_PORTB-&gt;OUT &amp;= ~BIT(11);   /* PB11 = 0 */
+JL_PORTB-&gt;DIR |=  BIT(11);   /* 输出 */
+
+/* 关闭引脚（低功耗：浮空并关输入缓冲） */
+gpio_close_uart0();          /* 释放调试串口引脚 */</code></pre>
+
+</section>
+<div class="tip">引脚编号宏为 <code>IO_PORTx_NN = 16×组 + 序号</code>，因此 API 里的 u32 gpio 可直接做数组下标换算。</div>
+<section class="card" id="wakeup">
+<h2 id="wakeup">唤醒与中断</h2>
+<p>引脚电平变化经 <b>JL_WAKEUP</b>（0x1E5108，CON0-CON3）产生 <code>IRQ_PORT_IDX</code>（中断号 13）端口中断；软关机后由 P33 域的独立唤醒检测支持按键开机。SDK 的按键驱动（AD 键/IO 键/触摸）都构建在该机制之上。</p>
+
+</section>
+
+      <div class="footer">
+        <a href="clock.html">← 时钟系统</a>
+        <span class="src">依据 SDK 头文件逆向整理 · JieLi AC6956C (BR23) · 仅供开发参考</span>
+        <a href="irq.html">中断系统 →</a>
+      </div>
+    </main>
+    <aside class="toc"><div class="t">本页目录</div><a href="#model">GPIO 模型</a><a href="#regs">寄存器（JL_PORTA @ 0x1E5000，B/C/D 依次 +0x40）</a><a href="#mux">IO 复用与输出通道映射</a><a href="#ad">模拟复用（ADC 通道）</a><a href="#use">使用方法</a><a href="#wakeup">唤醒与中断</a></aside>
+  </div>
+</div>
+</body>
+</html>

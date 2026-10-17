@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SPI Flash 控制器 — AC6956C 参考手册</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<nav class="topbar"><div class="topbar-inner">
+  <a class="brand" href="index.html">
+    <span class="logo">AC6956C<em>·BR23</em></span>
+    <span class="sub">芯片参考手册</span>
+  </a>
+  <div class="navlinks"><a href="index.html">芯片总览</a><a href="clock.html">时钟系统</a><a href="gpio.html">GPIO 与 IO 复用</a><a href="irq.html">中断系统</a><a href="uart.html">UART 串口</a><a href="spi.html">SPI 总线</a><a href="iic.html">IIC 总线</a><a href="timer.html">定时器</a><a href="mcpwm.html">MCPWM</a><a href="adc.html">ADC 采样</a><a href="audio.html">音频系统</a><a href="usb.html">USB 设备</a><a href="sdio.html">SD / TF 卡</a><a href="sfc.html" class=active>SPI Flash 控制器</a><a href="power.html">电源管理</a><a href="dma-sec.html">DMA 与安全加速器</a><a href="misc.html">其他外设</a></div>
+</div></nav>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="crumb">CHAPTER 14</div>
+    <h1>SPI Flash 控制器</h1>
+    <p>片内 1MB NOR 的 XIP 控制器：1/2/4 线命令、SFCENC 加密与 eFuse 校验、VM 持久区——对应 JL_SFC（0x1F0200）/ JL_SFCENC（0x1F0300）。</p>
+  </header>
+
+  <div class="layout">
+    <main class="main">
+<section class="card" id="ov">
+<h2 id="ov">概述</h2>
+
+<p>SFC（Serial Flash Controller）管理 <b>片内 1MB NOR Flash</b>，CPU 经 XIP
+直接执行代码（所以代码区只读，运行数据在 RAM/VM）。支持 1/2/4 线命令、
+可配四线最高频率（<code>clock_set_sfc_max_freq()</code>），并有 <b>SFCENC</b>
+加密单元：按 eFuse ChipKey 对指定地址区加解密——出厂镜像若密钥不符则无法启动。</p>
+<div class="fig"><svg viewBox="0 0 900 360" xmlns="http://www.w3.org/2000/svg" role="img"><defs><marker id="arw" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#5b6b8c"/></marker></defs><rect x="30" y="40" width="190" height="80" rx="9" fill="#e8eefc" stroke="#2456d6" stroke-width="1.4"/><text x="125.0" y="76.125" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12.5" font-weight="800" fill="#14264d">CPU 取指 / 数据</text><text x="125.0" y="92.625" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">XIP 零等待读</text><rect x="30" y="200" width="190" height="80" rx="9" fill="#e6f5ec" stroke="#1e7f4f" stroke-width="1.4"/><text x="125.0" y="227.875" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12.5" font-weight="800" fill="#14264d">SFC 命令</text><text x="125.0" y="244.375" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">CODE：SPI 命令字</text><text x="125.0" y="260.875" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">QUCNT：四线计数</text><rect x="330" y="100" width="210" height="120" rx="9" fill="#eef1f7" stroke="#8a94a6" stroke-width="1.4"/><text x="435.0" y="130.55" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="13" font-weight="800" fill="#14264d">SFC 控制器</text><text x="435.0" y="147.55" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">CON 控制</text><text x="435.0" y="164.55" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">BAUD 分频</text><text x="435.0" y="181.55" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">BASE_ADR 映射</text><text x="435.0" y="198.55" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">1/2/4 线</text><rect x="650" y="100" width="200" height="120" rx="9" fill="#fdf3e3" stroke="#b7791f" stroke-width="1.4"/><text x="750.0" y="139.625" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12.5" font-weight="800" fill="#14264d">片内 NOR 1MB</text><text x="750.0" y="156.125" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">0x000000-0x0FFFFF</text><text x="750.0" y="172.625" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">uboot / app / 资源 / VM</text><text x="750.0" y="189.125" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">eFuse 密钥加密</text><rect x="650" y="260" width="200" height="70" rx="9" fill="#f4ebfa" stroke="#7c2d92" stroke-width="1.4"/><text x="750.0" y="291.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="800" fill="#14264d">SFCENC 加密单元</text><text x="750.0" y="307.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">KEY / 明文区地址</text><line x1="220" y1="70" x2="330" y2="120" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><line x1="220" y1="240" x2="330" y2="200" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><line x1="540" y1="160" x2="650" y2="160" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><line x1="750" y1="220" x2="750" y2="260" stroke="#5b6b8c" stroke-width="1.6"/><line x1="650" y1="295" x2="540" y2="180" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)" stroke-dasharray="5,4"/></svg><div class="figcap">图 14-1  SFC 与片内 Flash</div></div>
+
+
+</section>
+<section class="card" id="regs">
+<h2 id="regs">寄存器</h2>
+<div class="tbl-wrap"><table class="tbl "><thead><tr><th>偏移</th><th>寄存器</th><th>属性</th><th>说明</th></tr></thead><tbody>
+<tr><td><code class="rg">0x00</code></td><td><code class="rg">SFC CON</code></td><td><span class="rw rw">RW</span></td><td>控制器状态/模式（JL_SFC @ 0x1F0200）</td></tr>
+<tr><td><code class="rg">0x04</code></td><td><code class="rg">SFC BAUD</code></td><td><span class="rw wo">WO</span></td><td>SCK 分频</td></tr>
+<tr><td><code class="rg">0x08</code></td><td><code class="rg">SFC CODE</code></td><td><span class="rw wo">WO</span></td><td>SPI 命令（读/写/擦除指令字）</td></tr>
+<tr><td><code class="rg">0x0C</code></td><td><code class="rg">SFC BASE_ADR</code></td><td><span class="rw wo">WO</span></td><td>XIP 映射基地址</td></tr>
+<tr><td><code class="rg">0x10</code></td><td><code class="rg">SFC QUCNT</code></td><td><span class="rw wo">WO</span></td><td>四线模式计数</td></tr>
+<tr><td><code class="rg">0x00</code></td><td><code class="rg">SFCENC CON</code></td><td><span class="rw rw">RW</span></td><td>加密使能/模式（JL_SFCENC @ 0x1F0300）</td></tr>
+<tr><td><code class="rg">0x04</code></td><td><code class="rg">SFCENC KEY</code></td><td><span class="rw rw">RW</span></td><td>密钥（与 eFuse 派生）</td></tr>
+<tr><td><code class="rg">0x08</code></td><td><code class="rg">SFCENC UNENC_ADRH/L</code></td><td><span class="rw wo">WO</span></td><td>明文区地址窗口</td></tr>
+<tr><td><code class="rg">0x10</code></td><td><code class="rg">SFCENC LENC_ADRH/L</code></td><td><span class="rw wo">WO</span></td><td>加密区地址窗口</td></tr>
+</tbody></table></div>
+
+</section>
+<section class="card" id="map">
+<h2 id="map">Flash 内容布局（isd 打包产物）</h2>
+<div class="tbl-wrap"><table class="tbl "><thead><tr><th>区域</th><th>内容</th><th>说明</th></tr></thead><tbody>
+<tr><td>0x0000-</td><td>ISD 头 + 配置</td><td>isd_config.ini 生成的启动参数</td></tr>
+<tr><td></td><td>uboot.boot</td><td>二级引导（负责解密/跳转）</td></tr>
+<tr><td></td><td>app.bin</td><td>应用程序（XIP 执行）</td></tr>
+<tr><td></td><td>资源（音效/字体/配置）</td><td>资源区</td></tr>
+<tr><td>0xE8000-0xFC000</td><td>VM 区</td><td>syscfg_read/write 的持久存储（80KB）</td></tr>
+<tr><td>0xFD000-0xFF000</td><td>BTIF / LRIF 保留</td><td>蓝牙状态，升级时保留</td></tr>
+</tbody></table></div>
+
+</section>
+<section class="card" id="use">
+<h2 id="use">使用方法</h2>
+<pre><code>#include &quot;asm/spiflash.h&quot;
+#include &quot;asm/sfc_norflash_api.h&quot;
+
+/* SDK 已把片内 flash 封装为设备，读写以&quot;页/扇区&quot;为单位 */
+spi_flash_dev_read(addr, buf, len);       /* 读 */
+spi_flash_dev_erase_sector(sector);       /* 擦 4KB（写入前必须擦） */
+spi_flash_dev_write(addr, buf, len);      /* 写 */
+
+/* 频率上限（四线 100MHz 需 flash 支持） */
+clock_set_sfc_max_freq(40000000, 80000000);
+
+/* VM 持久存储（掉电保存） */
+#include &quot;syscfg_id.h&quot;
+syscfg_write(CFG_EBOOK_SHELF, &amp;data, sizeof(data));
+syscfg_read(CFG_EBOOK_SHELF, &amp;data, sizeof(data));</code></pre>
+
+</section>
+<div class="warn">代码区 XIP 只读；任何扇区擦写期间会挂起总线（卡顿数十 ms），实时性敏感路径（音频 ISR）避免触发 flash 写。VM 写入同样如此——阅读器每次翻页写一次 VM 是可接受的频率。</div>
+<div class="note">加密启动：镜像由 isd_download 以 <code>-key</code> 密钥流加密，芯片 eFuse 校验 ChipKey（本机 0xB165）。经实测，离线打包（Device offline）阶段产物与密钥文件无关，烧录失败应先排查 uboot/电源而非盲目换 key。</div>
+
+      <div class="footer">
+        <a href="sdio.html">← SD / TF 卡</a>
+        <span class="src">依据 SDK 头文件逆向整理 · JieLi AC6956C (BR23) · 仅供开发参考</span>
+        <a href="power.html">电源管理 →</a>
+      </div>
+    </main>
+    <aside class="toc"><div class="t">本页目录</div><a href="#ov">概述</a><a href="#regs">寄存器</a><a href="#map">Flash 内容布局（isd 打包产物）</a><a href="#use">使用方法</a></aside>
+  </div>
+</div>
+</body>
+</html>

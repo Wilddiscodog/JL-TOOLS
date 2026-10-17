@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MCPWM 多通道 PWM — AC6956C 参考手册</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<nav class="topbar"><div class="topbar-inner">
+  <a class="brand" href="index.html">
+    <span class="logo">AC6956C<em>·BR23</em></span>
+    <span class="sub">芯片参考手册</span>
+  </a>
+  <div class="navlinks"><a href="index.html">芯片总览</a><a href="clock.html">时钟系统</a><a href="gpio.html">GPIO 与 IO 复用</a><a href="irq.html">中断系统</a><a href="uart.html">UART 串口</a><a href="spi.html">SPI 总线</a><a href="iic.html">IIC 总线</a><a href="timer.html">定时器</a><a href="mcpwm.html" class=active>MCPWM</a><a href="adc.html">ADC 采样</a><a href="audio.html">音频系统</a><a href="usb.html">USB 设备</a><a href="sdio.html">SD / TF 卡</a><a href="sfc.html">SPI Flash 控制器</a><a href="power.html">电源管理</a><a href="dma-sec.html">DMA 与安全加速器</a><a href="misc.html">其他外设</a></div>
+</div></nav>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="crumb">CHAPTER 9</div>
+    <h1>MCPWM 多通道 PWM</h1>
+    <p>6 时基 × 8 比较通道的 PWM 发生器：边沿/中心对齐、互补死区、H/L 双输出与通道重映射——对应 JL_MCPWM（0x1E3000）。</p>
+  </header>
+
+  <div class="layout">
+    <main class="main">
+<section class="card" id="ov">
+<h2 id="ov">概述</h2>
+
+<p>MCPWM 是独立的 <b>多通道 PWM 发生器</b>：6 个时基定时器 × 8 个比较通道，
+每通道 H/L 两路输出，支持边沿/中心对齐与互补（带死区）模式，
+用于背光调光、电机驱动、呼吸灯等。寄存器在 <code>JL_MCPWM @ 0x1E3000</code>，
+SDK 提供 <code>struct pwm_platform_data</code> 描述式配置。</p>
+<div class="fig"><svg viewBox="0 0 900 340" xmlns="http://www.w3.org/2000/svg" role="img"><defs><marker id="arw" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#5b6b8c"/></marker></defs><rect x="30" y="30" width="180" height="56" rx="9" fill="#f4ebfa" stroke="#7c2d92" stroke-width="1.4"/><text x="120.0" y="54.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="800" fill="#14264d">LSB 时钟</text><text x="120.0" y="70.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">FPIN_CON 外部触发</text><rect x="30" y="200" width="180" height="100" rx="9" fill="#e8eefc" stroke="#2456d6" stroke-width="1.4"/><text x="120.0" y="237.875" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12.5" font-weight="800" fill="#14264d">时基 TIMER0-5</text><text x="120.0" y="254.375" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">TMRx_CON/CNT/PR</text><text x="120.0" y="270.875" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">边沿/中心对齐</text><line x1="120" y1="86" x2="120" y2="200" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><rect x="330" y="190" width="220" height="120" rx="9" fill="#e6f5ec" stroke="#1e7f4f" stroke-width="1.4"/><text x="440.0" y="229.625" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12.5" font-weight="800" fill="#14264d">比较通道 CH0-CH7</text><text x="440.0" y="246.125" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">CHx_CON0 / CON1</text><text x="440.0" y="262.625" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">CMPH / CMPL</text><text x="440.0" y="279.125" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">互补死区（complementary）</text><line x1="210" y1="250" x2="330" y2="250" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><text x="270.0" y="245.0" text-anchor="middle" font-size="11" fill="#5b6b8c" font-family="Segoe UI,sans-serif">时基</text><rect x="670" y="190" width="170" height="120" rx="9" fill="#dbe4f5" stroke="#14264d" stroke-width="1.4"/><text x="755.0" y="230.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="800" fill="#14264d">H / L 引脚</text><text x="755.0" y="246.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">每通道 2 个输出</text><text x="755.0" y="262.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">硬件引脚或</text><text x="755.0" y="278.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">IO 通道重映射</text><line x1="550" y1="250" x2="670" y2="250" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/></svg><div class="figcap">图 9-1  MCPWM 结构（6 时基 × 8 通道）</div></div>
+
+
+</section>
+<section class="card" id="regs">
+<h2 id="regs">寄存器布局（0x1E3000，按 32 位访问）</h2>
+<div class="tbl-wrap"><table class="tbl "><thead><tr><th>偏移</th><th>寄存器</th><th>属性</th><th>说明</th></tr></thead><tbody>
+<tr><td><code class="rg">0x00</code></td><td><code class="rg">TMR0_CON/CNT/PR</code></td><td><span class="rw rw">RW</span></td><td>时基 0：控制/计数/周期（3×4B）</td></tr>
+<tr><td><code class="rg">0x0C</code></td><td><code class="rg">TMR1_CON/CNT/PR</code></td><td><span class="rw rw">RW</span></td><td>时基 1</td></tr>
+<tr><td><code class="rg">0x18</code></td><td><code class="rg">TMR2 - TMR5</code></td><td><span class="rw rw">RW</span></td><td>时基 2-5（各 0x0C）</td></tr>
+<tr><td><code class="rg">0x5C</code></td><td><code class="rg">FPIN_CON</code></td><td><span class="rw rw">RW</span></td><td>故障/外部引脚控制</td></tr>
+<tr><td><code class="rg">0x60</code></td><td><code class="rg">CH0_CON0/CON1/CMPH/CMPL</code></td><td><span class="rw rw">RW</span></td><td>通道 0：控制、比较高/低</td></tr>
+<tr><td><code class="rg">0x70</code></td><td><code class="rg">CH1 - CH7</code></td><td><span class="rw rw">RW</span></td><td>通道 1-7（各 0x10）</td></tr>
+<tr><td><code class="rg">0xF0</code></td><td><code class="rg">MCPWM_CON0</code></td><td><span class="rw rw">RW</span></td><td>全局控制</td></tr>
+</tbody></table></div>
+
+</section>
+<section class="card" id="cfg">
+<h2 id="cfg">pwm_platform_data 配置项</h2>
+<div class="tbl-wrap"><table class="tbl "><thead><tr><th>字段</th><th>说明</th></tr></thead><tbody>
+<tr><td><code>frequency</code></td><td>PWM 频率（该时基统一）</td></tr>
+<tr><td><code>pwm_ch_num</code></td><td>通道 <code>pwm_ch0-ch5</code></td></tr>
+<tr><td><code>pwm_timer_num</code></td><td>时基 <code>pwm_timer0-5</code></td></tr>
+<tr><td><code>duty</code></td><td>占空比 0-10000（对应 0-100%）</td></tr>
+<tr><td><code>pwm_aligned_mode</code></td><td><code>pwm_edge_aligned</code> 边沿 / <code>pwm_center_aligned</code> 中心</td></tr>
+<tr><td><code>h_pin / l_pin</code></td><td>通道高低引脚；-1 表示不接硬件引脚</td></tr>
+<tr><td><code>h/l_pin_output_ch_num</code></td><td>非硬件引脚时占用的 GPIO 输出通道号（0-2）</td></tr>
+<tr><td><code>complementary_en</code></td><td>1=H/L 同相，0=互补（带死区）</td></tr>
+</tbody></table></div>
+
+</section>
+<section class="card" id="use">
+<h2 id="use">使用方法</h2>
+<pre><code>#include &quot;asm/mcpwm.h&quot;
+
+struct pwm_platform_data pwm0 = {
+    .frequency        = 1000,            /* 1kHz */
+    .pwm_ch_num       = pwm_ch0,
+    .pwm_timer_num    = pwm_timer0,
+    .duty             = 5000,            /* 50% */
+    .pwm_aligned_mode = pwm_edge_aligned,
+    .h_pin            = IO_PORTB_04,     /* 硬件 H 引脚 */
+    .l_pin            = -1,
+    .complementary_en = 1,
+};
+/* 设备层注册后由 dev-&gt;init 生效（SDK 驱动枚举 MCPWM 设备） */
+
+/* 运行时改占空比：直接写比较寄存器 */
+JL_MCPWM-&gt;CH0_CMPL = new_duty;</code></pre>
+
+</section>
+<div class="note">注意通道枚举 <code>pwm_ch_max = 6</code> 与硬件 8 通道（CH0-7）的差异：SDK 设备层仅暴露 6 通道；CH6/CH7 可经寄存器直接使用。</div>
+
+      <div class="footer">
+        <a href="timer.html">← 定时器</a>
+        <span class="src">依据 SDK 头文件逆向整理 · JieLi AC6956C (BR23) · 仅供开发参考</span>
+        <a href="adc.html">ADC 采样 →</a>
+      </div>
+    </main>
+    <aside class="toc"><div class="t">本页目录</div><a href="#ov">概述</a><a href="#regs">寄存器布局（0x1E3000，按 32 位访问）</a><a href="#cfg">pwm_platform_data 配置项</a><a href="#use">使用方法</a></aside>
+  </div>
+</div>
+</body>
+</html>

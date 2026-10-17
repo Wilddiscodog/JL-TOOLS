@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>定时器 — AC6956C 参考手册</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<nav class="topbar"><div class="topbar-inner">
+  <a class="brand" href="index.html">
+    <span class="logo">AC6956C<em>·BR23</em></span>
+    <span class="sub">芯片参考手册</span>
+  </a>
+  <div class="navlinks"><a href="index.html">芯片总览</a><a href="clock.html">时钟系统</a><a href="gpio.html">GPIO 与 IO 复用</a><a href="irq.html">中断系统</a><a href="uart.html">UART 串口</a><a href="spi.html">SPI 总线</a><a href="iic.html">IIC 总线</a><a href="timer.html" class=active>定时器</a><a href="mcpwm.html">MCPWM</a><a href="adc.html">ADC 采样</a><a href="audio.html">音频系统</a><a href="usb.html">USB 设备</a><a href="sdio.html">SD / TF 卡</a><a href="sfc.html">SPI Flash 控制器</a><a href="power.html">电源管理</a><a href="dma-sec.html">DMA 与安全加速器</a><a href="misc.html">其他外设</a></div>
+</div></nav>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="crumb">CHAPTER 8</div>
+    <h1>定时器</h1>
+    <p>4 组 32 位定时器：系统时基、周期中断与 TIMER-PWM 输出——对应 JL_TIMER0-3（0x1E0400 起）。</p>
+  </header>
+
+  <div class="layout">
+    <main class="main">
+<section class="card" id="ov">
+<h2 id="ov">概述</h2>
+
+<p>4 个 32 位通用定时器（TIMER0-3），寄存器组仅 4 个：CON / CNT / PRD / PWM。
+SDK 用其中之一维护系统 TICK（<code>timer_get_ms()</code>），
+<code>timer_pwm_init()</code> 可把任意 TIMER 变成 PWM 输出通道（经 IO 输出通道映射到引脚）。
+高频 PWM 需求应改用 MCPWM 外设（8 通道）。</p>
+<div class="fig"><svg viewBox="0 0 860 280" xmlns="http://www.w3.org/2000/svg" role="img"><defs><marker id="arw" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#5b6b8c"/></marker></defs><rect x="30" y="90" width="170" height="60" rx="9" fill="#f4ebfa" stroke="#7c2d92" stroke-width="1.4"/><text x="115.0" y="116.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="800" fill="#14264d">LSB 时钟</text><text x="115.0" y="132.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">分频（CON）</text><rect x="300" y="70" width="190" height="100" rx="9" fill="#e8eefc" stroke="#2456d6" stroke-width="1.4"/><text x="395.0" y="107.55" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="13" font-weight="800" fill="#14264d">32 位计数器</text><text x="395.0" y="124.55" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">CNT：当前值</text><text x="395.0" y="141.55" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">PRD：周期</text><line x1="200" y1="120" x2="300" y2="120" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><text x="250.0" y="115.0" text-anchor="middle" font-size="11" fill="#5b6b8c" font-family="Segoe UI,sans-serif">CLK</text><rect x="600" y="40" width="190" height="66" rx="9" fill="#eef1f7" stroke="#8a94a6" stroke-width="1.4"/><text x="695.0" y="69.125" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12.5" font-weight="800" fill="#14264d">中断</text><text x="695.0" y="85.625" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">IRQ_TIME0-3 (4-7)</text><rect x="600" y="160" width="190" height="66" rx="9" fill="#e6f5ec" stroke="#1e7f4f" stroke-width="1.4"/><text x="695.0" y="189.125" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12.5" font-weight="800" fill="#14264d">PWM 输出</text><text x="695.0" y="205.625" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">PWM 寄存器 + IO 通道</text><line x1="490" y1="100" x2="600" y2="73" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><text x="545.0" y="81.5" text-anchor="middle" font-size="11" fill="#5b6b8c" font-family="Segoe UI,sans-serif">CNT=PRD</text><line x1="490" y1="145" x2="600" y2="190" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><text x="545.0" y="162.5" text-anchor="middle" font-size="11" fill="#5b6b8c" font-family="Segoe UI,sans-serif">比较</text><rect x="300" y="210" width="190" height="56" rx="9" fill="#e6f5ec" stroke="#1e7f4f" stroke-width="1.4"/><text x="395.0" y="234.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="800" fill="#14264d">系统 TICK</text><text x="395.0" y="250.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">IRQ 3（OS 时基）</text><line x1="395" y1="170" x2="395" y2="210" stroke="#5b6b8c" stroke-width="1.6" stroke-dasharray="5,4"/></svg><div class="figcap">图 8-1  定时器结构</div></div>
+
+
+</section>
+<section class="card" id="regs">
+<h2 id="regs">寄存器（JL_TIMER0 @ 0x1E0400，TIMER1/2/3 = +0x100 递增）</h2>
+<div class="tbl-wrap"><table class="tbl "><thead><tr><th>偏移</th><th>寄存器</th><th>属性</th><th>说明</th></tr></thead><tbody>
+<tr><td><code class="rg">0x00</code></td><td><code class="rg">CON</code></td><td><span class="rw rw">RW</span></td><td>使能/时钟分频/计数模式（SDK 驱动管理）</td></tr>
+<tr><td><code class="rg">0x04</code></td><td><code class="rg">CNT</code></td><td><span class="rw rw">RW</span></td><td>当前计数值（可读写）</td></tr>
+<tr><td><code class="rg">0x08</code></td><td><code class="rg">PRD</code></td><td><span class="rw rw">RW</span></td><td>周期终值，CNT 计到 PRD 产生事件</td></tr>
+<tr><td><code class="rg">0x0C</code></td><td><code class="rg">PWM</code></td><td><span class="rw rw">RW</span></td><td>PWM 比较值/极性</td></tr>
+</tbody></table></div>
+
+</section>
+<section class="card" id="use">
+<h2 id="use">使用方法</h2>
+<pre><code>#include &quot;asm/timer.h&quot;
+#include &quot;asm/mcpwm.h&quot;
+
+/* 1. 系统时基（SDK 已自动启用） */
+u32 now = timer_get_ms();
+u32 sec = timer_get_sec();
+delay_2ms(10);                       /* 阻塞延时（2ms 粒度） */
+
+/* 2. OS 级软定时器（推荐，非阻塞） */
+#include &quot;system/timer.h&quot;
+sys_timer_add(NULL, my_tick_cb, 20);     /* 20ms 周期回调 */
+sys_timeout_add(NULL, once_cb, 500);     /* 单次 */
+
+/* 3. TIMERx 直接作 PWM 输出 */
+timer_pwm_init(JL_TIMER0,               /* 定时器 */
+               20000,                   /* 20kHz */
+               500,                     /* 占空比 0-10000 */
+               IO_PORTA_02,             /* 输出引脚 */
+               CH0_T0_PWM_OUT);         /* IO 输出通道 */
+set_timer_pwm_duty(JL_TIMER0, 2500);</code></pre>
+
+</section>
+<div class="note">实践建议：UI 刷新/按键扫描用 <code>sys_timer_add</code>（OS 软定时器），只有精确波形才占硬件 TIMER；软关机前记得 <code>sys_timer_del</code> 清理。</div>
+
+      <div class="footer">
+        <a href="iic.html">← IIC 总线</a>
+        <span class="src">依据 SDK 头文件逆向整理 · JieLi AC6956C (BR23) · 仅供开发参考</span>
+        <a href="mcpwm.html">MCPWM →</a>
+      </div>
+    </main>
+    <aside class="toc"><div class="t">本页目录</div><a href="#ov">概述</a><a href="#regs">寄存器（JL_TIMER0 @ 0x1E0400，TIMER1/2/3 = +0x100 递增）</a><a href="#use">使用方法</a></aside>
+  </div>
+</div>
+</body>
+</html>

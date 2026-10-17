@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>时钟系统（CLK / PLL） — AC6956C 参考手册</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<nav class="topbar"><div class="topbar-inner">
+  <a class="brand" href="index.html">
+    <span class="logo">AC6956C<em>·BR23</em></span>
+    <span class="sub">芯片参考手册</span>
+  </a>
+  <div class="navlinks"><a href="index.html">芯片总览</a><a href="clock.html" class=active>时钟系统</a><a href="gpio.html">GPIO 与 IO 复用</a><a href="irq.html">中断系统</a><a href="uart.html">UART 串口</a><a href="spi.html">SPI 总线</a><a href="iic.html">IIC 总线</a><a href="timer.html">定时器</a><a href="mcpwm.html">MCPWM</a><a href="adc.html">ADC 采样</a><a href="audio.html">音频系统</a><a href="usb.html">USB 设备</a><a href="sdio.html">SD / TF 卡</a><a href="sfc.html">SPI Flash 控制器</a><a href="power.html">电源管理</a><a href="dma-sec.html">DMA 与安全加速器</a><a href="misc.html">其他外设</a></div>
+</div></nav>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="crumb">CHAPTER 2</div>
+    <h1>时钟系统（CLK / PLL）</h1>
+    <p>振荡源选择、PLL 五路输出、HSB/LSB/SFC 总线分频与外设时钟多路选择——对应 JL_CLOCK 寄存器组（0x1E0000）。</p>
+  </header>
+
+  <div class="layout">
+    <main class="main">
+<section class="card" id="tree">
+<h2 id="tree">时钟树</h2>
+
+<p>AC6956C 的时钟体系为 <b>振荡源 → PLL → 总线分频 → 外设时钟</b> 四级结构。
+系统主时钟可由 RC、BTOSC（12-26 MHz 晶振）、RTOSCL 或 PLL 提供（CLK_CON0[8:6]），
+SDK 默认使用 BTOSC×PLL 方案；本项目配置为 PLL480M ÷ 2 = <b>240 MHz</b>
+（<code>TCFG_CLOCK_SYS_HZ</code>）。</p>
+<div class="fig"><svg viewBox="0 0 920 520" xmlns="http://www.w3.org/2000/svg" role="img"><defs><marker id="arw" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#5b6b8c"/></marker></defs><rect x="30" y="40" width="150" height="56" rx="9" fill="#f4ebfa" stroke="#7c2d92" stroke-width="1.4"/><text x="105.0" y="64.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="13" font-weight="800" fill="#14264d">BTOSC 晶振</text><text x="105.0" y="81.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">12-26 MHz</text><rect x="30" y="150" width="150" height="56" rx="9" fill="#f4ebfa" stroke="#7c2d92" stroke-width="1.4"/><text x="105.0" y="174.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="13" font-weight="800" fill="#14264d">内部 RC</text><text x="105.0" y="191.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">250K / 16M</text><rect x="250" y="40" width="170" height="80" rx="9" fill="#e8eefc" stroke="#2456d6" stroke-width="1.4"/><text x="335.0" y="67.875" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12.5" font-weight="800" fill="#14264d">PLL</text><text x="335.0" y="84.375" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">480/320/192/137/107 M</text><text x="335.0" y="100.875" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">五路输出</text><line x1="180" y1="68" x2="250" y2="68" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><text x="215.0" y="63.0" text-anchor="middle" font-size="11" fill="#5b6b8c" font-family="Segoe UI,sans-serif">REF</text><line x1="180" y1="178" x2="240" y2="110" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><rect x="490" y="40" width="190" height="56" rx="9" fill="#eef1f7" stroke="#8a94a6" stroke-width="1.4"/><text x="585.0" y="64.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="800" fill="#14264d">PLL_SYS_SEL / DIV</text><text x="585.0" y="80.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">CLK_CON2[1:0]/[5:2]</text><line x1="420" y1="68" x2="490" y2="68" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><rect x="730" y="40" width="150" height="56" rx="9" fill="#e8eefc" stroke="#2456d6" stroke-width="1.4"/><text x="805.0" y="64.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="13" font-weight="800" fill="#14264d">HSB 时钟</text><text x="805.0" y="81.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">SYS_DIV[7:0]</text><line x1="680" y1="68" x2="730" y2="68" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><rect x="730" y="130" width="150" height="56" rx="9" fill="#eef1f7" stroke="#8a94a6" stroke-width="1.4"/><text x="805.0" y="154.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="13" font-weight="800" fill="#14264d">LSB 时钟</text><text x="805.0" y="171.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">SYS_DIV[10:8]</text><line x1="805" y1="96" x2="805" y2="130" stroke="#5b6b8c" stroke-width="1.6"/><rect x="730" y="220" width="150" height="56" rx="9" fill="#fdf3e3" stroke="#b7791f" stroke-width="1.4"/><text x="805.0" y="244.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="13" font-weight="800" fill="#14264d">SFC 时钟</text><text x="805.0" y="261.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">SYS_DIV[14:12]</text><line x1="805" y1="186" x2="805" y2="220" stroke="#5b6b8c" stroke-width="1.6"/><rect x="250" y="190" width="190" height="180" rx="9" fill="#e6f5ec" stroke="#1e7f4f" stroke-width="1.4"/><text x="345.0" y="245.275" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="800" fill="#14264d">外设时钟 CLK_CON1</text><text x="345.0" y="260.775" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.0" font-weight="500" fill="#4a5568">USB   [1:0]  PLL48M</text><text x="345.0" y="276.275" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.0" font-weight="500" fill="#4a5568">AUDIO [3:2]  PLL48M</text><text x="345.0" y="291.775" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.0" font-weight="500" fill="#4a5568">UART  [11:10] PLL48M</text><text x="345.0" y="307.275" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.0" font-weight="500" fill="#4a5568">BT    [15:14]</text><text x="345.0" y="322.775" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.0" font-weight="500" fill="#4a5568">WL2ADC/DAC</text><line x1="440" y1="90" x2="345" y2="190" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><rect x="250" y="410" width="190" height="70" rx="9" fill="#eef1f7" stroke="#8a94a6" stroke-width="1.4"/><text x="345.0" y="433.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="800" fill="#14264d">CLK_CON0</text><text x="345.0" y="449.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">主时钟源选择 [8:6]</text><text x="345.0" y="465.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">时钟输出 PA0/PB8</text><line x1="335" y1="68" x2="335" y2="150" stroke="#5b6b8c" stroke-width="1.6" stroke-dasharray="5,4"/><line x1="335" y1="150" x2="335" y2="410" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><text x="335.0" y="275.0" text-anchor="middle" font-size="11" fill="#5b6b8c" font-family="Segoe UI,sans-serif">主时钟 MUX</text></svg><div class="figcap">图 2-1  时钟树与外设时钟选择</div></div>
+
+<div class="tip">SDK 屏蔽了寄存器细节：应用层用 <code>clk_early_init()</code> /
+<code>clk_set()</code> / <code>sys_clk_set()</code>（clock.h）。直接改寄存器前务必先注册
+<code>CLOCK_CRITICAL_HANDLE_REG</code> 临界区回调，否则频率切换会撕裂蓝牙时序。</div>
+
+</section>
+<section class="card" id="regs">
+<h2 id="regs">寄存器总表（JL_CLOCK @ 0x1E0000）</h2>
+<div class="tbl-wrap"><table class="tbl "><thead><tr><th>偏移</th><th>寄存器</th><th>属性</th><th>说明</th></tr></thead><tbody>
+<tr><td><code class="rg">0x00</code></td><td><code class="rg">PWR_CON</code></td><td><span class="rw rw">RW</span></td><td>电源控制（SDK 上电默认配置，勿动）</td></tr>
+<tr><td><code class="rg">0x04</code></td><td><code class="rg">HTC_CON</code></td><td><span class="rw rw">RW</span></td><td>HTC 控制</td></tr>
+<tr><td><code class="rg">0x08</code></td><td><code class="rg">SYS_DIV</code></td><td><span class="rw rw">RW</span></td><td>HSB/LSB/SFC 分频</td></tr>
+<tr><td><code class="rg">0x0C</code></td><td><code class="rg">CLK_CON0</code></td><td><span class="rw rw">RW</span></td><td>主时钟源选择、RC 振荡、时钟输出</td></tr>
+<tr><td><code class="rg">0x10</code></td><td><code class="rg">CLK_CON1</code></td><td><span class="rw rw">RW</span></td><td>外设时钟源选择（USB/AUDIO/UART/BT…）</td></tr>
+<tr><td><code class="rg">0x14</code></td><td><code class="rg">CLK_CON2</code></td><td><span class="rw rw">RW</span></td><td>PLL 系统时钟选择与分频</td></tr>
+<tr><td><code class="rg">0x18</code></td><td><code class="rg">CLK_CON3</code></td><td><span class="rw rw">RW</span></td><td>内核复位控制（SDK 保留）</td></tr>
+<tr><td><code class="rg">0x40</code></td><td><code class="rg">PLL_CON</code></td><td><span class="rw rw">RW</span></td><td>PLL 主控制</td></tr>
+<tr><td><code class="rg">0x44</code></td><td><code class="rg">PLL_CON1</code></td><td><span class="rw rw">RW</span></td><td>PLL 分频/输出使能/LDO</td></tr>
+<tr><td><code class="rg">0x48</code></td><td><code class="rg">PLL_INTF</code></td><td><span class="rw rw">RW</span></td><td>PLL 接口</td></tr>
+<tr><td><code class="rg">0x4C</code></td><td><code class="rg">PLL_DMAX</code></td><td><span class="rw rw">RW</span></td><td>PLL 分频上限</td></tr>
+<tr><td><code class="rg">0x50</code></td><td><code class="rg">PLL_DMIN</code></td><td><span class="rw rw">RW</span></td><td>PLL 分频下限</td></tr>
+<tr><td><code class="rg">0x54</code></td><td><code class="rg">PLL_DSTP</code></td><td><span class="rw rw">RW</span></td><td>PLL 分频步进</td></tr>
+</tbody></table></div>
+
+</section>
+<section class="card" id="con0">
+<h2 id="con0">CLK_CON0（0x0C）主时钟控制</h2>
+<div class="tbl-wrap"><table class="tbl "><thead><tr><th>位域</th><th>名称</th><th>说明</th></tr></thead><tbody>
+<tr><td><span class="bits-chip">[0]</span></td><td><code class='rg'>RC_EN</code></td><td>内部 RC 振荡使能</td></tr>
+<tr><td><span class="bits-chip">[1]</span></td><td><code class='rg'>RCH_EN</code></td><td>RC 高频选择：0=250K，1=16M</td></tr>
+<tr><td><span class="bits-chip">[3:2]</span></td><td><code class='rg'>TEST_SEL</code></td><td>测试时钟选择：0=主时钟，1=PAT</td></tr>
+<tr><td><span class="bits-chip">[5:4]</span></td><td><code class='rg'>OSC_CLOCK_IN</code></td><td>0=BTOSC，1=XOSC_FSCK，2=RTOSCL，3=PAT</td></tr>
+<tr><td><span class="bits-chip">[8:6]</span></td><td><code class='rg'>MAIN_CLOCK_SEL</code></td><td>主时钟：0=RC，4=BTOSC，6=RTOSCL，7=PLL</td></tr>
+<tr><td><span class="bits-chip">[9]</span></td><td><code class='rg'>SFR_MODE</code></td><td>SFR 时钟：0=随空闲停，1=常开</td></tr>
+<tr><td><span class="bits-chip">[12:10]</span></td><td><code class='rg'>PA0_CLOCK_OUT</code></td><td>PA0 时钟输出选择</td></tr>
+<tr><td><span class="bits-chip">[15:13]</span></td><td><code class='rg'>PB8_CLOCK_OUT</code></td><td>PB8 时钟输出选择</td></tr>
+</tbody></table></div>
+
+</section>
+<section class="card" id="con1">
+<h2 id="con1">CLK_CON1（0x10）外设时钟源</h2>
+<div class="tbl-wrap"><table class="tbl "><thead><tr><th>位域</th><th>名称</th><th>说明</th></tr></thead><tbody>
+<tr><td><span class="bits-chip">[1:0]</span></td><td><code class='rg'>USB_CLOCK_IN</code></td><td>USB：0=PLL48M，1=OSC，2=LSB，3=禁止</td></tr>
+<tr><td><span class="bits-chip">[3:2]</span></td><td><code class='rg'>AUDIO_CLOCK_IN</code></td><td>音频：0=PLL48M，1=OSC，2=LSB，3=禁止</td></tr>
+<tr><td><span class="bits-chip">[6:4]</span></td><td><code class='rg'>GPCNT_CLOCK_IN</code></td><td>通用计数器时钟源</td></tr>
+<tr><td><span class="bits-chip">[11:10]</span></td><td><code class='rg'>UART_CLOCK_IN</code></td><td>UART：0=PLL48M，1=OSC，2=LSB，3=禁止</td></tr>
+<tr><td><span class="bits-chip">[15:14]</span></td><td><code class='rg'>BT_CLOCK_IN</code></td><td>蓝牙：0=PLL48M，1=HSB，2=LSB，3=禁止</td></tr>
+<tr><td><span class="bits-chip">[17]</span></td><td><code class='rg'>SFC_SCKE</code></td><td>SFC 时钟停使能</td></tr>
+<tr><td><span class="bits-chip">[19:18]</span></td><td><code class='rg'>WL2ADC_CLOCK_IN</code></td><td>0=PLL96M，1=HSB，2=LSB，3=禁止</td></tr>
+<tr><td><span class="bits-chip">[22:21]</span></td><td><code class='rg'>WL2DAC_CLOCK_IN</code></td><td>同上</td></tr>
+<tr><td><span class="bits-chip">[29:28]</span></td><td><code class='rg'>SFC_CLOCK_DELAY</code></td><td>SFC 时钟延迟</td></tr>
+</tbody></table></div>
+
+</section>
+<div class="note">串口/USB 的 <b>PLL48M</b> 是 PLL 的固定 48 MHz 分支，不随系统主频变化——波特率因此稳定，即使系统降频运行。</div>
+<section class="card" id="con2">
+<h2 id="con2">CLK_CON2（0x14）系统时钟与分频</h2>
+<div class="tbl-wrap"><table class="tbl "><thead><tr><th>位域</th><th>名称</th><th>说明</th></tr></thead><tbody>
+<tr><td><span class="bits-chip">[1:0]</span></td><td><code class='rg'>PLL_SYS_SEL</code></td><td>0=192M，1=137M，2=320M，3=480M</td></tr>
+<tr><td><span class="bits-chip">[5:2]</span></td><td><code class='rg'>PLL_SYS_DIV</code></td><td>系统分频（编码见下）</td></tr>
+<tr><td><span class="bits-chip">[6]</span></td><td><code class='rg'>PLL_ALNK_EN</code></td><td>ALNK 时钟使能</td></tr>
+<tr><td><span class="bits-chip">[7]</span></td><td><code class='rg'>PLL_ALNK_SEL</code></td><td>0=192M/17，1=480M/39</td></tr>
+<tr><td><span class="bits-chip">[13:12]</span></td><td><code class='rg'>PLL_FM_SEL</code></td><td>FM 时钟：0=192M，1=137M，2=107M，3=禁止</td></tr>
+<tr><td><span class="bits-chip">[17:14]</span></td><td><code class='rg'>PLL_FM_DIV</code></td><td>FM 分频</td></tr>
+<tr><td><span class="bits-chip">[30]</span></td><td><code class='rg'>DPLL_UDEN</code></td><td>DPLL 更新使能</td></tr>
+</tbody></table></div>
+
+</section>
+<p>PLL_SYS_DIV 编码（与 SDK 枚举一致）：0→÷1，1→÷3，2→÷5，3→÷7；4-7→÷(1/3/5/7)×2；8-11→÷(1/3/5/7)×4；12-15→÷(1/3/5/7)×8。240 MHz = 480M 选 ÷1×2（编码 4）。</p>
+<section class="card" id="sysdiv">
+<h2 id="sysdiv">SYS_DIV（0x08）总线分频</h2>
+<div class="tbl-wrap"><table class="tbl "><thead><tr><th>位域</th><th>名称</th><th>说明</th></tr></thead><tbody>
+<tr><td><span class="bits-chip">[7:0]</span></td><td><code class='rg'>HSB_CLK_DIV</code></td><td>HSB 分频（0 = 直通；240M 配置在此）</td></tr>
+<tr><td><span class="bits-chip">[10:8]</span></td><td><code class='rg'>LSB_CLK_DIV</code></td><td>LSB 分频</td></tr>
+<tr><td><span class="bits-chip">[14:12]</span></td><td><code class='rg'>SFC_CLK_DIV</code></td><td>SFC 分频</td></tr>
+</tbody></table></div>
+
+</section>
+<section class="card" id="pll">
+<h2 id="pll">PLL_CON（0x40）/ PLL_CON1（0x44）</h2>
+<div class="tbl-wrap"><table class="tbl "><thead><tr><th>位域</th><th>名称</th><th>说明</th></tr></thead><tbody>
+<tr><td><span class="bits-chip">CON[0]</span></td><td><code class='rg'>PLL_EN</code></td><td>PLL 使能</td></tr>
+<tr><td><span class="bits-chip">CON[1]</span></td><td><code class='rg'>PLL_REST</code></td><td>PLL 复位</td></tr>
+<tr><td><span class="bits-chip">CON[8:2]</span></td><td><code class='rg'>PLL_DIVn</code></td><td>PLL 分频系数 n</td></tr>
+<tr><td><span class="bits-chip">CON[9]</span></td><td><code class='rg'>PLL_REF_SEL</code></td><td>参考时钟：0=BTOSC，1=RCLK</td></tr>
+<tr><td><span class="bits-chip">CON[17:16]</span></td><td><code class='rg'>PLL_RSEL</code></td><td>参考选择</td></tr>
+<tr><td><span class="bits-chip">CON[23:22]</span></td><td><code class='rg'>PLL_PFD</code></td><td>PFD 电流</td></tr>
+<tr><td><span class="bits-chip">CON[26:24]</span></td><td><code class='rg'>PLL_ICP</code></td><td>电荷泵电流</td></tr>
+<tr><td><span class="bits-chip">CON1[11:0]</span></td><td><code class='rg'>PLL_FBDS</code></td><td>反馈分频 DS</td></tr>
+<tr><td><span class="bits-chip">CON1[14:12]</span></td><td><code class='rg'>PLL_IVCO</code></td><td>VCO 电流</td></tr>
+<tr><td><span class="bits-chip">CON1[23:22]</span></td><td><code class='rg'>PLL_DIVn_EN</code></td><td>0=×2，1=直通，2=使能 2-33 分频</td></tr>
+<tr><td><span class="bits-chip">CON1[24-28]</span></td><td><code class='rg'>CLK nM_OE</code></td><td>480/320/192/137/107M 各路输出使能</td></tr>
+<tr><td><span class="bits-chip">CON1[30]</span></td><td><code class='rg'>PLL_DAC_OE</code></td><td>DAC 专用时钟输出使能</td></tr>
+</tbody></table></div>
+
+</section>
+<section class="card" id="use">
+<h2 id="use">使用方法</h2>
+<pre><code>#include &quot;asm/clock.h&quot;
+
+/* 1. SDK 标准流程：板级配置声明系统主频（board_config.h） */
+#define TCFG_CLOCK_SYS_HZ   240000000     /* PLL480M / 2 */
+#define TCFG_CLOCK_OSC_HZ   24000000      /* BTOSC 晶振频率 */
+
+/* 2. 运行时降频（如进省电模式）：24M / 48M 两档 */
+sys_clk_set(SYS_24M);
+sys_clk_set(SYS_48M);
+
+/* 3. 常用 API（asm/clock.h） */
+clk_get(&quot;sys&quot;);                          /* 查询当前频率 */
+clk_set(&quot;lsb&quot;, 8000000);                 /* 设定外设总线频率 */
+clock_dump();                            /* 打印时钟树状态（调试） */
+clock_set_sfc_max_freq(40000000, 80000000);
+
+/* 4. 把时钟引到引脚观察（测量主频/PLL） */
+PA0_CLOCK_OUT(PA0_CLOCK_OUT_HSB);        /* PA0 输出 HSB 时钟 */
+PB8_CLOCK_OUT(PB8_CLOCK_OUT_PLL320);     /* PB8 输出 PLL320M */</code></pre>
+
+</section>
+<div class="warn">本机（AC6956C8）实测：240 MHz 已是 PLL480M÷2 的规格上限，不要尝试 480M 直驱（超规格不可启动）。</div>
+
+      <div class="footer">
+        <a href="index.html">← 芯片总览</a>
+        <span class="src">依据 SDK 头文件逆向整理 · JieLi AC6956C (BR23) · 仅供开发参考</span>
+        <a href="gpio.html">GPIO 与 IO 复用 →</a>
+      </div>
+    </main>
+    <aside class="toc"><div class="t">本页目录</div><a href="#tree">时钟树</a><a href="#regs">寄存器总表（JL_CLOCK @ 0x1E0000）</a><a href="#con0">CLK_CON0（0x0C）主时钟控制</a><a href="#con1">CLK_CON1（0x10）外设时钟源</a><a href="#con2">CLK_CON2（0x14）系统时钟与分频</a><a href="#sysdiv">SYS_DIV（0x08）总线分频</a><a href="#pll">PLL_CON（0x40）/ PLL_CON1（0x44）</a><a href="#use">使用方法</a></aside>
+  </div>
+</div>
+</body>
+</html>

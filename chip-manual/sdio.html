@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SD / TF 卡控制器 — AC6956C 参考手册</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<nav class="topbar"><div class="topbar-inner">
+  <a class="brand" href="index.html">
+    <span class="logo">AC6956C<em>·BR23</em></span>
+    <span class="sub">芯片参考手册</span>
+  </a>
+  <div class="navlinks"><a href="index.html">芯片总览</a><a href="clock.html">时钟系统</a><a href="gpio.html">GPIO 与 IO 复用</a><a href="irq.html">中断系统</a><a href="uart.html">UART 串口</a><a href="spi.html">SPI 总线</a><a href="iic.html">IIC 总线</a><a href="timer.html">定时器</a><a href="mcpwm.html">MCPWM</a><a href="adc.html">ADC 采样</a><a href="audio.html">音频系统</a><a href="usb.html">USB 设备</a><a href="sdio.html" class=active>SD / TF 卡</a><a href="sfc.html">SPI Flash 控制器</a><a href="power.html">电源管理</a><a href="dma-sec.html">DMA 与安全加速器</a><a href="misc.html">其他外设</a></div>
+</div></nav>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="crumb">CHAPTER 13</div>
+    <h1>SD / TF 卡控制器</h1>
+    <p>双 SD/MMC 主机：命令/数据通路、卡检测与 DMA——对应 JL_SD0/SD1（0x1E1400 / 0x1E1500）。</p>
+  </header>
+
+  <div class="layout">
+    <main class="main">
+<section class="card" id="ov">
+<h2 id="ov">概述</h2>
+
+<p>双 SD/MMC 控制器（SD0 / SD1），支持 SD 卡 1/4 位模式。SDK 的文件系统
+（挂载为 <code>storage/sd0 / storage/sd1</code> 设备）构建其上。
+<b>本机 TF 卡接在 SD1</b>（PC3-PC5 引脚组），电子书、字库均存于 TF。</p>
+<div class="fig"><svg viewBox="0 0 860 280" xmlns="http://www.w3.org/2000/svg" role="img"><defs><marker id="arw" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#5b6b8c"/></marker></defs><rect x="30" y="60" width="190" height="70" rx="9" fill="#f4ebfa" stroke="#7c2d92" stroke-width="1.4"/><text x="125.0" y="91.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="800" fill="#14264d">时钟 / 分频</text><text x="125.0" y="107.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">CON1</text><rect x="30" y="170" width="190" height="70" rx="9" fill="#e6f5ec" stroke="#1e7f4f" stroke-width="1.4"/><text x="125.0" y="201.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="800" fill="#14264d">命令通道</text><text x="125.0" y="217.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">CPTR：命令指针</text><rect x="320" y="60" width="200" height="180" rx="9" fill="#e8eefc" stroke="#2456d6" stroke-width="1.4"/><text x="420.0" y="120.55" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="13" font-weight="800" fill="#14264d">SD/MMC 核心</text><text x="420.0" y="137.55" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">CON0 控制</text><text x="420.0" y="154.55" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">CON2 状态</text><text x="420.0" y="171.55" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">DPTR 数据指针</text><text x="420.0" y="188.55" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">CTU 超时</text><rect x="630" y="90" width="180" height="120" rx="9" fill="#dbe4f5" stroke="#14264d" stroke-width="1.4"/><text x="720.0" y="121.375" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12.5" font-weight="800" fill="#14264d">SD0 / SD1</text><text x="720.0" y="137.875" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">4 位总线</text><text x="720.0" y="154.375" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">CMD / CLK</text><text x="720.0" y="170.875" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">卡检测</text><text x="720.0" y="187.375" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">IRQ 16 / 17</text><line x1="220" y1="95" x2="320" y2="110" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><line x1="220" y1="205" x2="320" y2="190" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><line x1="520" y1="150" x2="630" y2="150" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/></svg><div class="figcap">图 13-1  SD/MMC 控制器</div></div>
+
+
+</section>
+<section class="card" id="regs">
+<h2 id="regs">寄存器（JL_SD0 @ 0x1E1400，SD1 @ 0x1E1500）</h2>
+<div class="tbl-wrap"><table class="tbl "><thead><tr><th>偏移</th><th>寄存器</th><th>属性</th><th>说明</th></tr></thead><tbody>
+<tr><td><code class="rg">0x00</code></td><td><code class="rg">CON0</code></td><td><span class="rw rw">RW</span></td><td>主控制</td></tr>
+<tr><td><code class="rg">0x04</code></td><td><code class="rg">CON1</code></td><td><span class="rw rw">RW</span></td><td>时钟分频/电气</td></tr>
+<tr><td><code class="rg">0x08</code></td><td><code class="rg">CON2</code></td><td><span class="rw rw">RW</span></td><td>状态/中断</td></tr>
+<tr><td><code class="rg">0x0C</code></td><td><code class="rg">CPTR</code></td><td><span class="rw wo">WO</span></td><td>命令指针（写入发送命令）</td></tr>
+<tr><td><code class="rg">0x10</code></td><td><code class="rg">DPTR</code></td><td><span class="rw wo">WO</span></td><td>数据指针（写入启动数据传输）</td></tr>
+<tr><td><code class="rg">0x14</code></td><td><code class="rg">CTU_CON</code></td><td><span class="rw rw">RW</span></td><td>超时控制</td></tr>
+<tr><td><code class="rg">0x18</code></td><td><code class="rg">CTU_CNT</code></td><td><span class="rw wo">WO</span></td><td>超时计数</td></tr>
+</tbody></table></div>
+
+</section>
+<div class="note">平台数据中 <code>.sfr = (volatile u16 *)JL_SD1</code>——SD 控制器部分寄存器按 16 位访问，与全芯片 32 位访问的惯例不同，移植驱动时注意。</div>
+<section class="card" id="use">
+<h2 id="use">使用方法</h2>
+<pre><code>#include &quot;asm/sdmmc.h&quot;
+
+/* 板级配置（本机 TF = SD1） */
+SD1_PLATFORM_DATA_BEGIN(sd1_data);
+    .port                   = &#x27;C&#x27;,          /* PC3-PC5 */
+    .priority               = 3,
+    .max_freq               = 25000000,
+SD1_PLATFORM_END();
+
+/* 电源与挂载（SDK 设备层自动完成） */
+sd_set_power(1);                          /* TF 供电轨 */
+dev_manager_online_check_by_logo(&quot;sd1&quot;, 0);  /* 在线检查 */
+
+/* 文件系统访问（fscan/fopen 见 fs.h） */
+eb_scan = fscan(&quot;storage/sd1/C/EBOOK/&quot;, &quot;-tTXT -sn&quot;, 1);</code></pre>
+
+</section>
+<div class="tip">TF 供电与按键梯共用 POW_FLS 电源轨（PB11）——<code>sd_set_power/sdpg_config</code> 会接管该轨，初始化顺序：先按键采样、后挂 TF。</div>
+
+      <div class="footer">
+        <a href="usb.html">← USB 设备</a>
+        <span class="src">依据 SDK 头文件逆向整理 · JieLi AC6956C (BR23) · 仅供开发参考</span>
+        <a href="sfc.html">SPI Flash 控制器 →</a>
+      </div>
+    </main>
+    <aside class="toc"><div class="t">本页目录</div><a href="#ov">概述</a><a href="#regs">寄存器（JL_SD0 @ 0x1E1400，SD1 @ 0x1E1500）</a><a href="#use">使用方法</a></aside>
+  </div>
+</div>
+</body>
+</html>

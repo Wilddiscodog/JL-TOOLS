@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ADC 采样 — AC6956C 参考手册</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<nav class="topbar"><div class="topbar-inner">
+  <a class="brand" href="index.html">
+    <span class="logo">AC6956C<em>·BR23</em></span>
+    <span class="sub">芯片参考手册</span>
+  </a>
+  <div class="navlinks"><a href="index.html">芯片总览</a><a href="clock.html">时钟系统</a><a href="gpio.html">GPIO 与 IO 复用</a><a href="irq.html">中断系统</a><a href="uart.html">UART 串口</a><a href="spi.html">SPI 总线</a><a href="iic.html">IIC 总线</a><a href="timer.html">定时器</a><a href="mcpwm.html">MCPWM</a><a href="adc.html" class=active>ADC 采样</a><a href="audio.html">音频系统</a><a href="usb.html">USB 设备</a><a href="sdio.html">SD / TF 卡</a><a href="sfc.html">SPI Flash 控制器</a><a href="power.html">电源管理</a><a href="dma-sec.html">DMA 与安全加速器</a><a href="misc.html">其他外设</a></div>
+</div></nav>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="crumb">CHAPTER 10</div>
+    <h1>ADC 采样</h1>
+    <p>16 通道全差分 SARADC：外部引脚、PMU/音频内部通道、轮询采样表与独占模式——对应 JL_ADC（0x1E3100）。</p>
+  </header>
+
+  <div class="layout">
+    <main class="main">
+<section class="card" id="ov">
+<h2 id="ov">概述</h2>
+
+<p>全差分 SARADC，<b>16 个输入通道</b>：14 个外部引脚复用 + RTC + 内部 MUX
+（PMU 电压/温度、音频偏置、PLL/FM/BT 监测）。SDK 驱动维护一张最多 10 通道的
+<b>轮询采样表</b>——调用 <code>adc_add_sample_ch()</code> 后硬件循环采样，
+<code>adc_get_value()</code> 取最近值，适合按键分压、电池电压等低频场景；
+需要精确单次测量用 <code>adc_enter_occupy_mode()</code> 独占模式。</p>
+<div class="fig"><svg viewBox="0 0 880 380" xmlns="http://www.w3.org/2000/svg" role="img"><defs><marker id="arw" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#5b6b8c"/></marker></defs><rect x="30" y="30" width="190" height="330" rx="9" fill="#e6f5ec" stroke="#1e7f4f" stroke-width="1.4"/><text x="125.0" y="167.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="800" fill="#14264d">外部通道</text><text x="125.0" y="183.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">PA1  PA5  PA6  PA10</text><text x="125.0" y="199.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">PA12 PB1  PB3  PB4</text><text x="125.0" y="215.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">PB8  PB10 PC4  PC5</text><text x="125.0" y="231.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">PC6  DP</text><rect x="280" y="40" width="180" height="80" rx="9" fill="#f4ebfa" stroke="#7c2d92" stroke-width="1.4"/><text x="370.0" y="68.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="800" fill="#14264d">内部 MUX 通道</text><text x="370.0" y="84.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">PMU：VBAT/LDO5V/</text><text x="370.0" y="100.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">VDC13/DTEMP/BG…</text><rect x="280" y="160" width="180" height="80" rx="9" fill="#f4ebfa" stroke="#7c2d92" stroke-width="1.4"/><text x="370.0" y="188.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="800" fill="#14264d">内部 MUX 通道</text><text x="370.0" y="204.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">AUDIO：VOUT/米克偏置</text><text x="370.0" y="220.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">PLL/FM/BT 监测</text><rect x="280" y="280" width="180" height="60" rx="9" fill="#f4ebfa" stroke="#7c2d92" stroke-width="1.4"/><text x="370.0" y="306.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="800" fill="#14264d">RTC 通道</text><text x="370.0" y="322.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">AD_CH_RTC</text><rect x="560" y="120" width="150" height="120" rx="9" fill="#e8eefc" stroke="#2456d6" stroke-width="1.4"/><text x="635.0" y="159.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="13" font-weight="800" fill="#14264d">SARADC</text><text x="635.0" y="176.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">CON</text><text x="635.0" y="193.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">RES（结果）</text><text x="635.0" y="210.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">IRQ 23</text><line x1="220" y1="180" x2="560" y2="180" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><line x1="460" y1="80" x2="560" y2="150" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><line x1="460" y1="200" x2="560" y2="180" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><line x1="460" y1="310" x2="560" y2="215" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><rect x="770" y="130" width="90" height="100" rx="9" fill="#eef1f7" stroke="#8a94a6" stroke-width="1.4"/><text x="815.0" y="160.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="800" fill="#14264d">软件</text><text x="815.0" y="176.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">轮询表</text><text x="815.0" y="192.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">adc_add_</text><text x="815.0" y="208.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">sample_ch()</text></svg><div class="figcap">图 10-1  ADC 通道结构</div></div>
+
+
+</section>
+<section class="card" id="regs">
+<h2 id="regs">寄存器（JL_ADC @ 0x1E3100）</h2>
+<div class="tbl-wrap"><table class="tbl "><thead><tr><th>偏移</th><th>寄存器</th><th>属性</th><th>说明</th></tr></thead><tbody>
+<tr><td><code class="rg">0x00</code></td><td><code class="rg">CON</code></td><td><span class="rw rw">RW</span></td><td>采样控制（通道选择/启动，SDK 驱动管理）</td></tr>
+<tr><td><code class="rg">0x04</code></td><td><code class="rg">RES</code></td><td><span class="rw ro">RO</span></td><td>采样结果（原始码值）</td></tr>
+</tbody></table></div>
+
+</section>
+<div class="note">控制位细节在闭源驱动内；结果需经 VBG 基准换算：<code>电压 = adc_value_to_voltage(vbg, val)</code>，SDK 自动用 PMU 带隙基准校准。</div>
+<section class="card" id="ch">
+<h2 id="ch">通道定义（adc_api.h）</h2>
+<div class="tbl-wrap"><table class="tbl "><thead><tr><th>组</th><th>宏</th><th>说明</th></tr></thead><tbody>
+<tr><td>外部</td><td><code>AD_CH_PA1 PA5 PA6 PA10 PA12 PB1 PB3 PB4 PB8 PB10 PC4 PC5 PC6 DP</code></td><td>引脚复用，直接用引脚名</td></tr>
+<tr><td>RTC</td><td><code>AD_CH_RTC</code></td><td>RTC 域信号</td></tr>
+<tr><td>PMU</td><td><code>AD_CH_VBAT</code>（VBAT÷4）、<code>AD_CH_LDO5V</code>（÷4）、<code>AD_CH_VDC13 / SYSVDD / DTEMP / PMU_VBG / WVDD / PROGF</code></td><td>电源监测：电池电压、USB 输入、芯片温度</td></tr>
+<tr><td>AUDIO</td><td><code>AD_CH_F/R_VOUTL/R MICLDO CTADCREF DACVDD</code></td><td>音频模拟监测</td></tr>
+<tr><td>PLL/FM/BT</td><td><code>AD_CH_BIAS ANALOG DIGITAL 480MEG FMTX_SEL BT_SEL</code></td><td>射频/模拟监测</td></tr>
+</tbody></table></div>
+
+</section>
+<section class="card" id="use">
+<h2 id="use">使用方法</h2>
+<pre><code>#include &quot;asm/adc_api.h&quot;
+
+/* 1. 加入轮询表（内部会启动 ADC 循环采样） */
+adc_add_sample_ch(AD_CH_PB1);        /* AD 按键 */
+adc_add_sample_ch(AD_CH_VBAT);       /* 电池电压 */
+
+/* 2. 读取原始值 / 换算电压 */
+u32 raw = adc_get_value(AD_CH_PB1);
+u32 mv  = adc_get_voltage(AD_CH_VBAT);
+
+/* 3. 精确单次测量（独占模式，测完释放） */
+adc_enter_occupy_mode(AD_CH_VDC13);
+u32 v = adc_get_occupy_value();
+adc_exit_occupy_mode();
+
+/* 4. 电压换算辅助（用 VBG 基准校准） */
+u32 volt = adc_value_to_voltage(adc_get_value(AD_CH_PMU_VBG), raw);</code></pre>
+
+</section>
+<div class="tip">本机实践：AD 按键梯（PB1）上电采样前必须先拉高电源轨 PB11（POW_FLS），并确认 <code>adc_add_sample_ch(AD_CH_PB1)</code> 已注册——否则 adc_get_value 恒为 0。</div>
+
+      <div class="footer">
+        <a href="mcpwm.html">← MCPWM</a>
+        <span class="src">依据 SDK 头文件逆向整理 · JieLi AC6956C (BR23) · 仅供开发参考</span>
+        <a href="audio.html">音频系统 →</a>
+      </div>
+    </main>
+    <aside class="toc"><div class="t">本页目录</div><a href="#ov">概述</a><a href="#regs">寄存器（JL_ADC @ 0x1E3100）</a><a href="#ch">通道定义（adc_api.h）</a><a href="#use">使用方法</a></aside>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>中断系统 — AC6956C 参考手册</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<nav class="topbar"><div class="topbar-inner">
+  <a class="brand" href="index.html">
+    <span class="logo">AC6956C<em>·BR23</em></span>
+    <span class="sub">芯片参考手册</span>
+  </a>
+  <div class="navlinks"><a href="index.html">芯片总览</a><a href="clock.html">时钟系统</a><a href="gpio.html">GPIO 与 IO 复用</a><a href="irq.html" class=active>中断系统</a><a href="uart.html">UART 串口</a><a href="spi.html">SPI 总线</a><a href="iic.html">IIC 总线</a><a href="timer.html">定时器</a><a href="mcpwm.html">MCPWM</a><a href="adc.html">ADC 采样</a><a href="audio.html">音频系统</a><a href="usb.html">USB 设备</a><a href="sdio.html">SD / TF 卡</a><a href="sfc.html">SPI Flash 控制器</a><a href="power.html">电源管理</a><a href="dma-sec.html">DMA 与安全加速器</a><a href="misc.html">其他外设</a></div>
+</div></nav>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="crumb">CHAPTER 4</div>
+    <h1>中断系统</h1>
+    <p>pi32v2 内核 64 源中断控制器：中断号总表、优先级、向量注册与 ISR 编写规范。</p>
+  </header>
+
+  <div class="layout">
+    <main class="main">
+<section class="card" id="model">
+<h2 id="model">中断模型</h2>
+
+<p>pi32v2 内核支持 <b>64 个中断源</b>（向量表基址 <code>IRQ_MEM_ADDR = 0x2BF00</code>），
+每个源可注册回调并指定优先级。SDK 封装了注册/开关接口，驱动里中断服务函数用
+<code>___interrupt</code> 属性修饰。</p>
+<div class="note">hwi.h 中每个中断号后的注释（0/1/2）为 SDK 建议的优先级档位：
+数字越大优先级越高，蓝牙时序相关（27/28/30/38）建议保持 2 级。</div>
+
+</section>
+<section class="card" id="tbl">
+<h2 id="tbl">中断源总表</h2>
+<div class="tbl-wrap"><table class="tbl "><thead><tr><th>#</th><th>宏（hwi.h）</th><th>外设 / 说明</th></tr></thead><tbody>
+<tr><td>0</td><td>IRQ_EMUEXCPT_IDX</td><td>仿真异常</td></tr>
+<tr><td>1</td><td>IRQ_EXCEPTION_IDX</td><td>异常</td></tr>
+<tr><td>2</td><td>IRQ_SYSCALL_IDX</td><td>系统调用</td></tr>
+<tr><td>3</td><td>IRQ_TICK_TMR_IDX</td><td>系统 TICK</td></tr>
+<tr><td>4</td><td>IRQ_TIME0_IDX</td><td>定时器 0</td></tr>
+<tr><td>5</td><td>IRQ_TIME1_IDX</td><td>定时器 1</td></tr>
+<tr><td>6</td><td>IRQ_TIME2_IDX</td><td>定时器 2</td></tr>
+<tr><td>7</td><td>IRQ_TIME3_IDX</td><td>定时器 3</td></tr>
+<tr><td>8</td><td>IRQ_USB_SOF_IDX</td><td>USB 帧起始</td></tr>
+<tr><td>9</td><td>IRQ_USB_CTRL_IDX</td><td>USB 控制/数据</td></tr>
+<tr><td>10</td><td>IRQ_RTC_WDT_IDX</td><td>RTC / WDT</td></tr>
+<tr><td>11</td><td>IRQ_ALINK0_IDX</td><td>ALNK0 音频链路</td></tr>
+<tr><td>12</td><td>IRQ_AUDIO_IDX</td><td>Audio FIFO</td></tr>
+<tr><td>13</td><td>IRQ_PORT_IDX</td><td>GPIO 电平变化</td></tr>
+<tr><td>14</td><td>IRQ_SPI0_IDX</td><td>SPI0</td></tr>
+<tr><td>15</td><td>IRQ_SPI1_IDX</td><td>SPI1</td></tr>
+<tr><td>16</td><td>IRQ_SD0_IDX</td><td>SD0</td></tr>
+<tr><td>17</td><td>IRQ_SD1_IDX</td><td>SD1</td></tr>
+<tr><td>18</td><td>IRQ_UART0_IDX</td><td>UART0</td></tr>
+<tr><td>19</td><td>IRQ_UART1_IDX</td><td>UART1</td></tr>
+<tr><td>20</td><td>IRQ_UART2_IDX</td><td>UART2</td></tr>
+<tr><td>21</td><td>IRQ_PAP_IDX</td><td>并口 PAP</td></tr>
+<tr><td>22</td><td>IRQ_IIC_IDX</td><td>硬件 I²C</td></tr>
+<tr><td>23</td><td>IRQ_SARADC_IDX</td><td>SARADC</td></tr>
+<tr><td>24</td><td>IRQ_PDM_LINK_IDX</td><td>PDM 链路</td></tr>
+<tr><td>25</td><td>IRQ_RDEC0_IDX</td><td>旋转解码 0</td></tr>
+<tr><td>26</td><td>IRQ_LRCT_IDX</td><td>低功耗计数</td></tr>
+<tr><td>27</td><td>IRQ_BREDR_IDX</td><td>蓝牙 BR/EDR</td></tr>
+<tr><td>28</td><td>IRQ_BT_CLKN_IDX</td><td>蓝牙时钟</td></tr>
+<tr><td>29</td><td>IRQ_BT_DBG_IDX</td><td>蓝牙调试</td></tr>
+<tr><td>30</td><td>IRQ_WL_LOFC_IDX</td><td>无线 LOFC</td></tr>
+<tr><td>31</td><td>IRQ_SRC_IDX</td><td>SRC 采样率转换</td></tr>
+<tr><td>32</td><td>IRQ_FFT_IDX</td><td>FFT 加速</td></tr>
+<tr><td>33</td><td>IRQ_EQ_IDX</td><td>硬件 EQ</td></tr>
+<tr><td>34</td><td>IRQ_LP_TIMER0_IDX</td><td>低功耗定时器 0</td></tr>
+<tr><td>35</td><td>IRQ_LP_TIMER1_IDX</td><td>低功耗定时器 1</td></tr>
+<tr><td>36</td><td>IRQ_ALINK1_IDX</td><td>ALNK1 音频链路</td></tr>
+<tr><td>37</td><td>IRQ_OSA_IDX</td><td>OSA</td></tr>
+<tr><td>38</td><td>IRQ_BLE_RX_IDX</td><td>BLE RX</td></tr>
+<tr><td>39</td><td>IRQ_BLE_EVENT_IDX</td><td>BLE 事件</td></tr>
+<tr><td>40</td><td>IRQ_AES_IDX</td><td>AES 加速</td></tr>
+<tr><td>41</td><td>IRQ_MCTMRX_IDX</td><td>MC 定时器</td></tr>
+<tr><td>42</td><td>IRQ_CHX_PWM_IDX</td><td>MCPWM 通道</td></tr>
+<tr><td>43</td><td>IRQ_FMRX_IDX</td><td>FM 接收</td></tr>
+<tr><td>44</td><td>IRQ_SPI2_IDX</td><td>SPI2</td></tr>
+<tr><td>45</td><td>IRQ_SBC_IDX</td><td>SBC 编解码</td></tr>
+<tr><td>46</td><td>IRQ_GPC_IDX</td><td>GPCNT</td></tr>
+<tr><td>47</td><td>IRQ_FMTX_IDX</td><td>FM 发射</td></tr>
+<tr><td>48</td><td>IRQ_DCP_IDX</td><td>DCP 拷贝</td></tr>
+<tr><td>49</td><td>IRQ_RDEC1_IDX</td><td>旋转解码 1</td></tr>
+<tr><td>50</td><td>IRQ_RDEC2_IDX</td><td>旋转解码 2</td></tr>
+<tr><td>51</td><td>IRQ_SPDIF_IDX</td><td>SPDIF</td></tr>
+<tr><td>52</td><td>IRQ_PWM_LED_IDX</td><td>PWM 呼吸灯</td></tr>
+<tr><td>53</td><td>IRQ_CTM_IDX</td><td>CTM 触摸</td></tr>
+<tr><td>60-63</td><td>IRQ_SOFT0-3_IDX</td><td>软件中断</td></tr>
+</tbody></table></div>
+
+</section>
+<section class="card" id="use">
+<h2 id="use">使用方法</h2>
+<pre><code>#include &quot;asm/hwi.h&quot;
+#include &quot;asm/irq.h&quot;
+
+/* 1. 注册中断：优先级 0-3，cpu_id 固定填 0 */
+static ___interrupt void my_spi2_isr(void)
+{
+    if (JL_SPI2-&gt;CON &amp; BIT(4)) {        /* pending? */
+        /* ... 读取数据 ... */
+        spi_clear_pending(SPI2);
+    }
+}
+
+request_irq(IRQ_SPI2_IDX, 1, my_spi2_isr, 0);
+
+/* 2. 开关中断（掩码操作） */
+irq_disable(IRQ_SPI2_IDX);
+irq_enable(IRQ_SPI2_IDX);
+
+/* 3. 卸载 */
+unrequest_irq(IRQ_SPI2_IDX);
+
+/* 4. 临界区（关闭全局中断） */
+local_irq_disable();
+/* ... */
+local_irq_enable();</code></pre>
+
+</section>
+<div class="warn">ISR 中不得调用阻塞 API（如 fopen/printf 长打印）；与主循环共享数据用 <code>local_irq_disable()</code> 保护或做成环形缓冲。SDK 的 UART/SPI 中断收发已封装好，一般无需自写 ISR。</div>
+
+      <div class="footer">
+        <a href="gpio.html">← GPIO 与 IO 复用</a>
+        <span class="src">依据 SDK 头文件逆向整理 · JieLi AC6956C (BR23) · 仅供开发参考</span>
+        <a href="uart.html">UART 串口 →</a>
+      </div>
+    </main>
+    <aside class="toc"><div class="t">本页目录</div><a href="#model">中断模型</a><a href="#tbl">中断源总表</a><a href="#use">使用方法</a></aside>
+  </div>
+</div>
+</body>
+</html>

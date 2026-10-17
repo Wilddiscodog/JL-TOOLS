@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AC6956C（BR23）芯片参考手册 — AC6956C 参考手册</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<nav class="topbar"><div class="topbar-inner">
+  <a class="brand" href="index.html">
+    <span class="logo">AC6956C<em>·BR23</em></span>
+    <span class="sub">芯片参考手册</span>
+  </a>
+  <div class="navlinks"><a href="index.html" class=active>芯片总览</a><a href="clock.html">时钟系统</a><a href="gpio.html">GPIO 与 IO 复用</a><a href="irq.html">中断系统</a><a href="uart.html">UART 串口</a><a href="spi.html">SPI 总线</a><a href="iic.html">IIC 总线</a><a href="timer.html">定时器</a><a href="mcpwm.html">MCPWM</a><a href="adc.html">ADC 采样</a><a href="audio.html">音频系统</a><a href="usb.html">USB 设备</a><a href="sdio.html">SD / TF 卡</a><a href="sfc.html">SPI Flash 控制器</a><a href="power.html">电源管理</a><a href="dma-sec.html">DMA 与安全加速器</a><a href="misc.html">其他外设</a></div>
+</div></nav>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="crumb">REFERENCE MANUAL</div>
+    <h1>AC6956C（BR23）芯片参考手册</h1>
+    <p>杰理 pi32v2 音频 SoC —— 依据 SDK 头文件逆向整理的寄存器级参考手册：涵盖时钟、GPIO、串口、SPI/I²C、定时器、PWM、ADC、音频、USB、SD 卡、Flash 控制器、电源管理与安全加速器。</p>
+  </header>
+
+  <div class="layout">
+    <main class="main">
+<section class="card" id="intro">
+<h2 id="intro">芯片简介</h2>
+
+<p>AC6956C（SDK 内部平台代号 <b>BR23</b>）是杰理科技的蓝牙音频 SoC，内核为杰理自主的
+<b>pi32v2</b> 32 位 DSP（头文件中亦称 q32DSP），面向蓝牙音箱、学习机、故事机等音频产品。
+本手册全部内容依据 SDK 头文件（<code>include_lib/driver/cpu/br23/asm/</code> 等）逆向整理，
+寄存器地址与位域均可从 SDK 源码复核。</p>
+<div class="grid g4"><div class="kpi"><div class="v">pi32v2</div><div class="k">32 位 DSP 内核</div></div><div class="kpi"><div class="v">240 MHz</div><div class="k">最高系统主频（PLL480M÷2）</div></div><div class="kpi"><div class="v">1 MB</div><div class="k">片内 NOR Flash（SFC）</div></div><div class="kpi"><div class="v">3.0-3.6 V</div><div class="k">VDDIO 工作电压（可配）</div></div></div>
+
+<p><b>主要特性：</b></p>
+<ul>
+<li>片内 NOR Flash 直接代码执行（XIP），支持 1/2/4 线模式与 eFuse 密钥加密启动</li>
+<li>五路 PLL 输出（480/320/192/137/107 MHz），HSB/LSB/SFC 独立分频</li>
+<li>3×UART、3×SPI、1×硬件 I²C、4×32 位定时器、8 通道 MCPWM</li>
+<li>全差分 SARADC（16 通道含 PMU/音频内部通道），硬件 Audio DAC/ADC + FIFO</li>
+<li>USB Full-Speed 设备控制器（5 组端点，SDK 内置 HID/CDC/MSC/AUDIO 类驱动）</li>
+<li>双 SD/MMC 控制器（TF 卡）、RTC/PWR 掉电域（P33）、硬件 CRC16/AES</li>
+</ul>
+<div class="note"><b>命名说明：</b>SDK 中 <code>JL_XXX</code> 宏为各外设寄存器结构体指针，
+定义于 <code>asm/br23.h</code>（总线外设）与 <code>asm/csfr.h</code>（内核 SFR）。
+寄存器统一按 32 位访问——结构体中 <code>__u8/__u16</code> 均被宏替换为
+<code>unsigned int</code>。</div>
+
+</section>
+<section class="card" id="arch">
+<h2 id="arch">系统架构框图</h2>
+
+<div class="fig"><svg viewBox="0 0 940 560" xmlns="http://www.w3.org/2000/svg" role="img"><defs><marker id="arw" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#5b6b8c"/></marker></defs><rect x="370" y="30" width="200" height="70" rx="9" fill="#e8eefc" stroke="#2456d6" stroke-width="1.4"/><text x="470.0" y="60.9" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="14" font-weight="800" fill="#14264d">pi32v2 DSP 内核</text><text x="470.0" y="78.9" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12.5" font-weight="500" fill="#4a5568">最高 240 MHz</text><rect x="300" y="165" width="340" height="44" rx="9" fill="#eef1f7" stroke="#8a94a6" stroke-width="1.4"/><text x="470.0" y="191.55" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="13" font-weight="500" fill="#14264d">HSB 高速总线 (0x1F0000)</text><rect x="140" y="165" width="120" height="44" rx="9" fill="#eef1f7" stroke="#8a94a6" stroke-width="1.4"/><text x="200.0" y="183.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="800" fill="#14264d">LSB 低速总线</text><text x="200.0" y="199.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">(0x1E0000)</text><line x1="470" y1="100" x2="470" y2="165" stroke="#5b6b8c" stroke-width="1.6"/><line x1="300" y1="187" x2="260" y2="187" stroke="#5b6b8c" stroke-width="1.6"/><line x1="105" y1="209" x2="105" y2="280" stroke="#5b6b8c" stroke-width="1.6" stroke-dasharray="5,4"/><line x1="255" y1="209" x2="255" y2="280" stroke="#5b6b8c" stroke-width="1.6" stroke-dasharray="5,4"/><line x1="405" y1="209" x2="405" y2="280" stroke="#5b6b8c" stroke-width="1.6" stroke-dasharray="5,4"/><line x1="555" y1="209" x2="555" y2="280" stroke="#5b6b8c" stroke-width="1.6" stroke-dasharray="5,4"/><line x1="705" y1="209" x2="705" y2="280" stroke="#5b6b8c" stroke-width="1.6" stroke-dasharray="5,4"/><rect x="40" y="280" width="130" height="60" rx="9" fill="#fdf3e3" stroke="#b7791f" stroke-width="1.4"/><text x="105.0" y="306.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="13" font-weight="800" fill="#14264d">SFC</text><text x="105.0" y="323.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">片内 Flash 控制</text><rect x="190" y="280" width="130" height="60" rx="9" fill="#fdf3e3" stroke="#b7791f" stroke-width="1.4"/><text x="255.0" y="306.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="13" font-weight="800" fill="#14264d">PSRAM 控制器</text><text x="255.0" y="323.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">(选配)</text><rect x="340" y="280" width="130" height="60" rx="9" fill="#e6f5ec" stroke="#1e7f4f" stroke-width="1.4"/><text x="405.0" y="306.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="13" font-weight="800" fill="#14264d">EQ / SRC</text><text x="405.0" y="323.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">音频加速</text><rect x="490" y="280" width="130" height="60" rx="9" fill="#e6f5ec" stroke="#1e7f4f" stroke-width="1.4"/><text x="555.0" y="306.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="13" font-weight="800" fill="#14264d">FM 收发</text><text x="555.0" y="323.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">DSP</text><rect x="640" y="280" width="130" height="60" rx="9" fill="#e6f5ec" stroke="#1e7f4f" stroke-width="1.4"/><text x="705.0" y="306.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="13" font-weight="800" fill="#14264d">DCP</text><text x="705.0" y="323.05" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="500" fill="#4a5568">拷贝加速</text><rect x="40" y="415" width="130" height="56" rx="9" fill="#e6f5ec" stroke="#1e7f4f" stroke-width="1.4"/><text x="105.0" y="439.125" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12.5" font-weight="800" fill="#14264d">CLOCK / RST</text><text x="105.0" y="455.625" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">时钟与复位</text><line x1="105" y1="209" x2="105" y2="415" stroke="#5b6b8c" stroke-width="1.6" stroke-dasharray="5,4"/><rect x="190" y="415" width="130" height="56" rx="9" fill="#e6f5ec" stroke="#1e7f4f" stroke-width="1.4"/><text x="255.0" y="439.125" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12.5" font-weight="800" fill="#14264d">TIMER0-3</text><text x="255.0" y="455.625" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">定时器</text><line x1="255" y1="209" x2="255" y2="415" stroke="#5b6b8c" stroke-width="1.6" stroke-dasharray="5,4"/><rect x="340" y="415" width="130" height="56" rx="9" fill="#e6f5ec" stroke="#1e7f4f" stroke-width="1.4"/><text x="405.0" y="439.125" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12.5" font-weight="800" fill="#14264d">UART0-2</text><text x="405.0" y="455.625" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">串口</text><line x1="405" y1="209" x2="405" y2="415" stroke="#5b6b8c" stroke-width="1.6" stroke-dasharray="5,4"/><rect x="490" y="415" width="130" height="56" rx="9" fill="#e6f5ec" stroke="#1e7f4f" stroke-width="1.4"/><text x="555.0" y="439.125" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12.5" font-weight="800" fill="#14264d">SPI0-2</text><text x="555.0" y="455.625" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">SPI</text><line x1="555" y1="209" x2="555" y2="415" stroke="#5b6b8c" stroke-width="1.6" stroke-dasharray="5,4"/><rect x="640" y="415" width="130" height="56" rx="9" fill="#e6f5ec" stroke="#1e7f4f" stroke-width="1.4"/><text x="705.0" y="439.125" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12.5" font-weight="800" fill="#14264d">IIC</text><text x="705.0" y="455.625" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">I²C</text><line x1="705" y1="209" x2="705" y2="415" stroke="#5b6b8c" stroke-width="1.6" stroke-dasharray="5,4"/><rect x="790" y="415" width="130" height="56" rx="9" fill="#e6f5ec" stroke="#1e7f4f" stroke-width="1.4"/><text x="855.0" y="439.125" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12.5" font-weight="800" fill="#14264d">SD0 / SD1</text><text x="855.0" y="455.625" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">TF 卡</text><line x1="855" y1="209" x2="855" y2="415" stroke="#5b6b8c" stroke-width="1.6" stroke-dasharray="5,4"/><rect x="40" y="495" width="130" height="56" rx="9" fill="#e6f5ec" stroke="#1e7f4f" stroke-width="1.4"/><text x="105.0" y="519.125" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12.5" font-weight="800" fill="#14264d">PORTA-D</text><text x="105.0" y="535.625" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">GPIO</text><line x1="105" y1="209" x2="105" y2="495" stroke="#5b6b8c" stroke-width="1.6" stroke-dasharray="5,4"/><rect x="190" y="495" width="130" height="56" rx="9" fill="#f4ebfa" stroke="#7c2d92" stroke-width="1.4"/><text x="255.0" y="519.125" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12.5" font-weight="800" fill="#14264d">AUDIO/ANA</text><text x="255.0" y="535.625" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">音频模拟</text><line x1="255" y1="209" x2="255" y2="495" stroke="#5b6b8c" stroke-width="1.6" stroke-dasharray="5,4"/><rect x="340" y="495" width="130" height="56" rx="9" fill="#e6f5ec" stroke="#1e7f4f" stroke-width="1.4"/><text x="405.0" y="519.125" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12.5" font-weight="800" fill="#14264d">USB</text><text x="405.0" y="535.625" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">USB FS</text><line x1="405" y1="209" x2="405" y2="495" stroke="#5b6b8c" stroke-width="1.6" stroke-dasharray="5,4"/><rect x="490" y="495" width="130" height="56" rx="9" fill="#e6f5ec" stroke="#1e7f4f" stroke-width="1.4"/><text x="555.0" y="519.125" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12.5" font-weight="800" fill="#14264d">MCPWM</text><text x="555.0" y="535.625" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">PWM ×8</text><line x1="555" y1="209" x2="555" y2="495" stroke="#5b6b8c" stroke-width="1.6" stroke-dasharray="5,4"/><rect x="640" y="495" width="130" height="56" rx="9" fill="#e6f5ec" stroke="#1e7f4f" stroke-width="1.4"/><text x="705.0" y="519.125" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12.5" font-weight="800" fill="#14264d">ADC</text><text x="705.0" y="535.625" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">SARADC</text><line x1="705" y1="209" x2="705" y2="495" stroke="#5b6b8c" stroke-width="1.6" stroke-dasharray="5,4"/><rect x="790" y="495" width="130" height="56" rx="9" fill="#f4ebfa" stroke="#7c2d92" stroke-width="1.4"/><text x="855.0" y="519.125" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12.5" font-weight="800" fill="#14264d">P33 / PMU</text><text x="855.0" y="535.625" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">电源管理</text><line x1="855" y1="209" x2="855" y2="495" stroke="#5b6b8c" stroke-width="1.6" stroke-dasharray="5,4"/><rect x="640" y="165" width="130" height="44" rx="9" fill="#e6f5ec" stroke="#1e7f4f" stroke-width="1.4"/><text x="705.0" y="183.275" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.5" font-weight="800" fill="#14264d">CRC / AES / DMA</text><text x="705.0" y="198.775" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.0" font-weight="500" fill="#4a5568">加速与安全</text><line x1="705" y1="187" x2="705" y2="165" stroke="#5b6b8c" stroke-width="1.6"/></svg><div class="figcap">图 1-1  AC6956C 总线架构与外设概览（虚线 = 总线连接）</div></div>
+
+<p>系统由两条内部总线组成：<b>HSB 高速总线</b>（基址 0x1F0000）挂接 SFC、PSRAM、
+音频加速器等高带宽模块；<b>LSB 低速总线</b>（基址 0x1E0000）挂接全部常规外设。
+内核 SFR（中断控制、MMU、调试模块等）位于 0x100000 起始的独立空间，定义见
+<code>csfr.h</code>。</p>
+
+</section>
+<section class="card" id="addrmap">
+<h2 id="addrmap">外设地址映射</h2>
+
+<p>寄存器基址计算公式：<code>base = 段基址 + (64×grp + adr) × 4</code>
+（<code>map_adr</code> 宏，grp 0x00-0xFF、adr 0x00-0x3F，组间距 256 字节）。</p>
+<div class="tbl-wrap"><table class="tbl "><thead><tr><th>段</th><th>基址</th><th>外设</th><th>grp</th><th>寄存器基址</th><th>说明</th></tr></thead><tbody>
+<tr><td>HSB</td><td>0x1F0000</td><td>SFC</td><td>0x02</td><td><code>0x1F0200</code></td><td>SPI Flash 控制器（片内 NOR）</td></tr>
+<tr><td>HSB</td><td>0x1F0000</td><td>SFCENC</td><td>0x03</td><td><code>0x1F0300</code></td><td>Flash 加密单元</td></tr>
+<tr><td>HSB</td><td>0x1F0000</td><td>PSRAM</td><td>0x05</td><td><code>0x1F0500</code></td><td>PSRAM 控制器</td></tr>
+<tr><td>HSB</td><td>0x1F0000</td><td>DCP</td><td>0x13</td><td><code>0x1F1300</code></td><td>数据拷贝加速</td></tr>
+<tr><td>HSB</td><td>0x1F0000</td><td>EQ</td><td>0x15</td><td><code>0x1F1500</code></td><td>硬件 EQ</td></tr>
+<tr><td>HSB</td><td>0x1F0000</td><td>SRC</td><td>0x16</td><td><code>0x1F1600</code></td><td>采样率转换</td></tr>
+<tr><td>HSB</td><td>0x1F0000</td><td>FM</td><td>0x17</td><td><code>0x1F1700</code></td><td>FM 收发 DSP</td></tr>
+<tr><td>LSB</td><td>0x1E0000</td><td>CLOCK</td><td>0x00</td><td><code>0x1E0000</code></td><td>时钟/PLL/复位</td></tr>
+<tr><td>LSB</td><td>0x1E0000</td><td>TIMER0-3</td><td>0x04-07</td><td><code>0x1E0400</code>+</td><td>32 位定时器</td></tr>
+<tr><td>LSB</td><td>0x1E0000</td><td>PCNT / GPCNT</td><td>0x10/11</td><td><code>0x1E1000</code>+</td><td>脉冲计数器</td></tr>
+<tr><td>LSB</td><td>0x1E0000</td><td>SD0 / SD1</td><td>0x14/15</td><td><code>0x1E1400</code>+</td><td>SD/MMC</td></tr>
+<tr><td>LSB</td><td>0x1E0000</td><td>USB</td><td>0x18</td><td><code>0x1E1800</code></td><td>USB 设备控制器</td></tr>
+<tr><td>LSB</td><td>0x1E0000</td><td>ANA</td><td>0x19</td><td><code>0x1E1900</code></td><td>模拟寄存器 (DAA/ADA/WLA)</td></tr>
+<tr><td>LSB</td><td>0x1E0000</td><td>SPI0-2</td><td>0x1C-1E</td><td><code>0x1E1C00</code>+</td><td>SPI 主/从</td></tr>
+<tr><td>LSB</td><td>0x1E0000</td><td>UART0-2</td><td>0x20-22</td><td><code>0x1E2000</code>+</td><td>串口（含 DMA 收发）</td></tr>
+<tr><td>LSB</td><td>0x1E0000</td><td>IIC</td><td>0x24</td><td><code>0x1E2400</code></td><td>硬件 I²C</td></tr>
+<tr><td>LSB</td><td>0x1E0000</td><td>ALNK0/1</td><td>0x2E/33</td><td><code>0x1E2E00</code>+</td><td>数字音频接口 (IIS)</td></tr>
+<tr><td>LSB</td><td>0x1E0000</td><td>AUDIO</td><td>0x2F</td><td><code>0x1E2F00</code></td><td>Audio DAC/ADC FIFO</td></tr>
+<tr><td>LSB</td><td>0x1E0000</td><td>MCPWM</td><td>0x30</td><td><code>0x1E3000</code></td><td>8 通道 PWM</td></tr>
+<tr><td>LSB</td><td>0x1E0000</td><td>ADC</td><td>0x31</td><td><code>0x1E3100</code></td><td>SARADC</td></tr>
+<tr><td>LSB</td><td>0x1E0000</td><td>CRC</td><td>0x35</td><td><code>0x1E3500</code></td><td>CRC16 加速</td></tr>
+<tr><td>LSB</td><td>0x1E0000</td><td>EFUSE</td><td>0x37</td><td><code>0x1E3700</code></td><td>eFuse（ChipKey）</td></tr>
+<tr><td>LSB</td><td>0x1E0000</td><td>RAND</td><td>0x3B</td><td><code>0x1E3B00</code></td><td>真随机数</td></tr>
+<tr><td>LSB</td><td>0x1E0000</td><td>P33</td><td>0x3E</td><td><code>0x1E3E00</code></td><td>电源管理域接口</td></tr>
+<tr><td>LSB</td><td>0x1E0000</td><td>DMA</td><td>0x3F</td><td><code>0x1E3F00</code></td><td>系统 DMA</td></tr>
+<tr><td>LSB</td><td>0x1E0000</td><td>SBC</td><td>0x42</td><td><code>0x1E4200</code></td><td>SBC 编解码加速</td></tr>
+<tr><td>LSB</td><td>0x1E0000</td><td>AES</td><td>0x43</td><td><code>0x1E4300</code></td><td>AES 加解密</td></tr>
+<tr><td>LSB</td><td>0x1E0000</td><td>PORTA-D</td><td>0x50-53</td><td><code>0x1E5000</code>+</td><td>GPIO（每端口 0x40）</td></tr>
+<tr><td>LSB</td><td>0x1E0000</td><td>IOMAP/WAKEUP</td><td>0x51</td><td><code>0x1E5108</code>+</td><td>IO 复用与唤醒</td></tr>
+<tr><td>LSB</td><td>0x1E0000</td><td>PLED / LCD</td><td>0x52/53</td><td><code>0x1E5200</code>+</td><td>LED 呼吸灯 / LCD 偏压</td></tr>
+</tbody></table></div>
+
+
+</section>
+<section class="card" id="peris">
+<h2 id="peris">外设章节导航</h2>
+<div class="grid g4"><a href="clock.html" class="pcard"><div class="ic">⏱</div><div class="nm">时钟系统</div><div class="ds">PLL 五路输出、总线分频、外设时钟选择</div></a><a href="gpio.html" class="pcard"><div class="ic">🔌</div><div class="nm">GPIO 与 IO 复用</div><div class="ds">4×16 GPIO、上下拉/驱动、输出通道映射</div></a><a href="irq.html" class="pcard"><div class="ic">⚡</div><div class="nm">中断系统</div><div class="ds">64 个中断源、优先级、向量注册</div></a><a href="uart.html" class="pcard"><div class="ic">📡</div><div class="nm">UART 串口</div><div class="ds">3 路、DMA 环形收发、红外模式</div></a><a href="spi.html" class="pcard"><div class="ic">🔗</div><div class="nm">SPI 总线</div><div class="ds">3 组、1/2/4 线模式、主从</div></a><a href="iic.html" class="pcard"><div class="ic">🔗</div><div class="nm">IIC 总线</div><div class="ds">硬件 I²C 主从、完整位定义</div></a><a href="timer.html" class="pcard"><div class="ic">⏲</div><div class="nm">定时器</div><div class="ds">4×32 位定时器 + PWM 输出</div></a><a href="mcpwm.html" class="pcard"><div class="ic">📊</div><div class="nm">MCPWM</div><div class="ds">8 通道、6 时基、边沿/中心对齐</div></a><a href="adc.html" class="pcard"><div class="ic">🎚</div><div class="nm">ADC 采样</div><div class="ds">16 通道 SARADC、PMU 内部通道</div></a><a href="audio.html" class="pcard"><div class="ic">🎵</div><div class="nm">音频系统</div><div class="ds">DAC/ADC FIFO、模拟寄存器、ALNK</div></a><a href="usb.html" class="pcard"><div class="ic">🔌</div><div class="nm">USB 设备</div><div class="ds">Full-Speed、5 端点、UTMI 寄存器</div></a><a href="sdio.html" class="pcard"><div class="ic">💾</div><div class="nm">SD / TF 卡</div><div class="ds">双控制器、卡检测、DMA</div></a><a href="sfc.html" class="pcard"><div class="ic">🔏</div><div class="nm">SPI Flash 控制器</div><div class="ds">XIP、2/4 线、eFuse 加密</div></a><a href="power.html" class="pcard"><div class="ic">🔋</div><div class="nm">电源管理</div><div class="ds">P33 掉电域、充电、LVD、软关机</div></a><a href="dma-sec.html" class="pcard"><div class="ic">🚀</div><div class="nm">DMA 与安全加速器</div><div class="ds">系统 DMA、CRC16、AES、随机数</div></a><a href="misc.html" class="pcard"><div class="ic">📦</div><div class="nm">其他外设</div><div class="ds">WDT/RTC/RDEC/PWM-LED 等</div></a></div>
+
+</section>
+
+      <div class="footer">
+        <span></span>
+        <span class="src">依据 SDK 头文件逆向整理 · JieLi AC6956C (BR23) · 仅供开发参考</span>
+        <a href="clock.html">时钟系统 →</a>
+      </div>
+    </main>
+    <aside class="toc"><div class="t">本页目录</div><a href="#intro">芯片简介</a><a href="#arch">系统架构框图</a><a href="#addrmap">外设地址映射</a><a href="#peris">外设章节导航</a></aside>
+  </div>
+</div>
+</body>
+</html>

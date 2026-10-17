@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IIC 总线 — AC6956C 参考手册</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<nav class="topbar"><div class="topbar-inner">
+  <a class="brand" href="index.html">
+    <span class="logo">AC6956C<em>·BR23</em></span>
+    <span class="sub">芯片参考手册</span>
+  </a>
+  <div class="navlinks"><a href="index.html">芯片总览</a><a href="clock.html">时钟系统</a><a href="gpio.html">GPIO 与 IO 复用</a><a href="irq.html">中断系统</a><a href="uart.html">UART 串口</a><a href="spi.html">SPI 总线</a><a href="iic.html" class=active>IIC 总线</a><a href="timer.html">定时器</a><a href="mcpwm.html">MCPWM</a><a href="adc.html">ADC 采样</a><a href="audio.html">音频系统</a><a href="usb.html">USB 设备</a><a href="sdio.html">SD / TF 卡</a><a href="sfc.html">SPI Flash 控制器</a><a href="power.html">电源管理</a><a href="dma-sec.html">DMA 与安全加速器</a><a href="misc.html">其他外设</a></div>
+</div></nav>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="crumb">CHAPTER 7</div>
+    <h1>IIC 总线</h1>
+    <p>硬件 I²C 主/从控制器：完整公开的位定义、START/STOP 硬件时序、滤波与从机时钟拉伸——对应 JL_IIC（0x1E2400）。</p>
+  </header>
+
+  <div class="layout">
+    <main class="main">
+<section class="card" id="ov">
+<h2 id="ov">概述</h2>
+
+<p>1 路硬件 I²C（<code>JL_IIC @ 0x1E2400</code>），支持主机/从机、7 位寻址、
+时钟拉伸与滤波。<b>iic_hw.h 给出了完整的 CON0/CON1 位操作宏</b>——这是全芯片
+为数不多位定义完全公开的外设，可直接寄存器级编程。另有软件 I²C（iic_soft.h）
+可用任意 GPIO 模拟。</p>
+<div class="fig"><svg viewBox="0 0 860 260" xmlns="http://www.w3.org/2000/svg" role="img"><defs><marker id="arw" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#5b6b8c"/></marker></defs><rect x="30" y="30" width="180" height="70" rx="9" fill="#f4ebfa" stroke="#7c2d92" stroke-width="1.4"/><text x="120.0" y="61.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="800" fill="#14264d">APB / LSB 时钟</text><text x="120.0" y="77.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">BAUD 分频</text><rect x="30" y="150" width="180" height="70" rx="9" fill="#e6f5ec" stroke="#1e7f4f" stroke-width="1.4"/><text x="120.0" y="173.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="800" fill="#14264d">SCL 产生</text><text x="120.0" y="189.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">同步拉伸</text><text x="120.0" y="205.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">（从机 clock stretch）</text><rect x="320" y="60" width="210" height="130" rx="9" fill="#e8eefc" stroke="#2456d6" stroke-width="1.4"/><text x="425.0" y="96.375" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12.5" font-weight="800" fill="#14264d">I²C 核心</text><text x="425.0" y="112.875" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">CON0：使能/方向/ACK</text><text x="425.0" y="129.375" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">BUF：数据</text><text x="425.0" y="145.875" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">START/STOP 时序</text><text x="425.0" y="162.375" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">PND / END_PND 状态</text><rect x="640" y="90" width="180" height="70" rx="9" fill="#dbe4f5" stroke="#14264d" stroke-width="1.4"/><text x="730.0" y="112.875" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12.5" font-weight="800" fill="#14264d">SDA / SCL</text><text x="730.0" y="129.375" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">开漏输出</text><text x="730.0" y="145.875" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="11.0" font-weight="500" fill="#4a5568">4 组引脚映射</text><line x1="210" y1="65" x2="320" y2="95" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><line x1="210" y1="185" x2="320" y2="155" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><line x1="530" y1="125" x2="640" y2="125" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/></svg><div class="figcap">图 7-1  I²C 控制器框图</div></div>
+
+
+</section>
+<section class="card" id="regs">
+<h2 id="regs">寄存器（JL_IIC @ 0x1E2400）</h2>
+<div class="tbl-wrap"><table class="tbl "><thead><tr><th>偏移</th><th>寄存器</th><th>属性</th><th>说明</th></tr></thead><tbody>
+<tr><td><code class="rg">0x00</code></td><td><code class="rg">CON0</code></td><td><span class="rw rw">RW</span></td><td>主控寄存器（位定义见下）</td></tr>
+<tr><td><code class="rg">0x04</code></td><td><code class="rg">BUF</code></td><td><span class="rw rw">RW</span></td><td>数据寄存器</td></tr>
+<tr><td><code class="rg">0x08</code></td><td><code class="rg">BAUD</code></td><td><span class="rw wo">WO</span></td><td>波特率（SCL 频率分频）</td></tr>
+<tr><td><code class="rg">0x0C</code></td><td><code class="rg">CON1</code></td><td><span class="rw rw">RW</span></td><td>辅助控制（SI 模式/启动 pending）</td></tr>
+</tbody></table></div>
+
+</section>
+<section class="card" id="con0">
+<h2 id="con0">CON0 位定义（来自 iic_hw.h 宏）</h2>
+<div class="tbl-wrap"><table class="tbl "><thead><tr><th>位域</th><th>名称</th><th>说明</th></tr></thead><tbody>
+<tr><td><span class="bits-chip">[0]</span></td><td><code class='rg'>enable</code></td><td>模块使能</td></tr>
+<tr><td><span class="bits-chip">[1]</span></td><td><code class='rg'>role</code></td><td>0=主机，1=从机</td></tr>
+<tr><td><span class="bits-chip">[2]</span></td><td><code class='rg'>cfg_done</code></td><td>配置生效触发</td></tr>
+<tr><td><span class="bits-chip">[3]</span></td><td><code class='rg'>dir</code></td><td>0=输出，1=接收</td></tr>
+<tr><td><span class="bits-chip">[4]</span></td><td><code class='rg'>preset_end</code></td><td>预置 STOP</td></tr>
+<tr><td><span class="bits-chip">[5]</span></td><td><code class='rg'>preset_restart</code></td><td>预置重复 START</td></tr>
+<tr><td><span class="bits-chip">[6]</span></td><td><code class='rg'>recv_ack</code></td><td>接收时应答：0=ACK，1=NACK</td></tr>
+<tr><td><span class="bits-chip">[7]</span></td><td><code class='rg'>send_is_ack</code></td><td>（读）发送后收到 ACK 状态</td></tr>
+<tr><td><span class="bits-chip">[8]</span></td><td><code class='rg'>ie</code></td><td>字节中断使能</td></tr>
+<tr><td><span class="bits-chip">[9]</span></td><td><code class='rg'>isel</code></td><td>0=直通，1=滤波</td></tr>
+<tr><td><span class="bits-chip">[10]</span></td><td><code class='rg'>end_ie</code></td><td>传输结束中断使能</td></tr>
+<tr><td><span class="bits-chip">[12]</span></td><td><code class='rg'>end_pnd_clr</code></td><td>（写 1）清除结束 pending</td></tr>
+<tr><td><span class="bits-chip">[13]</span></td><td><code class='rg'>end_pnd</code></td><td>（读）传输结束标志</td></tr>
+<tr><td><span class="bits-chip">[14]</span></td><td><code class='rg'>pnd_clr</code></td><td>（写 1）清除字节 pending</td></tr>
+<tr><td><span class="bits-chip">[15]</span></td><td><code class='rg'>pnd</code></td><td>（读）字节传输完成标志</td></tr>
+</tbody></table></div>
+
+</section>
+<div class="tbl-wrap"><table class="tbl "><thead><tr><th>位域</th><th>名称</th><th>说明</th></tr></thead><tbody>
+<tr><td><span class="bits-chip">CON1[13]</span></td><td><code class='rg'>si_mode_en</code></td><td>从机 SI 模式</td></tr>
+<tr><td><span class="bits-chip">CON1[15]</span></td><td><code class='rg'>start_pnd</code></td><td>（读）检测到 START</td></tr>
+<tr><td><span class="bits-chip">CON1[14]</span></td><td><code class='rg'>start_pnd_clr</code></td><td>（写 1）清除 START pending</td></tr>
+</tbody></table></div>
+<section class="card" id="use">
+<h2 id="use">使用方法</h2>
+<pre><code>#include &quot;asm/iic_hw.h&quot;
+
+/* 寄存器级（宏齐全，主机写示例） */
+iic_disable(JL_IIC);
+iic_role_host(JL_IIC);
+iic_baud_reg(JL_IIC) = 200;         /* SCL 频率分频 */
+iic_cfg_done(JL_IIC);
+iic_enable(JL_IIC);
+
+/* 发送器件地址+写 */
+iic_dir_out(JL_IIC);
+iic_buf_reg(JL_IIC) = dev_addr &lt;&lt; 1;
+while (!iic_pnd(JL_IIC));
+iic_pnd_clr(JL_IIC);
+if (!iic_send_is_ack(JL_IIC)) { /* NACK 处理 */ }
+
+/* 推荐：SDK 设备层（软件 IIC 同接口，引脚自由） */</code></pre>
+
+</section>
+<div class="tip">触摸屏 CST836U、各类传感器用软 I²C 更常见（引脚自由）；硬件 I²C 适合固定引脚的高速场景。</div>
+
+      <div class="footer">
+        <a href="spi.html">← SPI 总线</a>
+        <span class="src">依据 SDK 头文件逆向整理 · JieLi AC6956C (BR23) · 仅供开发参考</span>
+        <a href="timer.html">定时器 →</a>
+      </div>
+    </main>
+    <aside class="toc"><div class="t">本页目录</div><a href="#ov">概述</a><a href="#regs">寄存器（JL_IIC @ 0x1E2400）</a><a href="#con0">CON0 位定义（来自 iic_hw.h 宏）</a><a href="#use">使用方法</a></aside>
+  </div>
+</div>
+</body>
+</html>

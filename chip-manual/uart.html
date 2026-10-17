@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UART 串口 — AC6956C 参考手册</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<nav class="topbar"><div class="topbar-inner">
+  <a class="brand" href="index.html">
+    <span class="logo">AC6956C<em>·BR23</em></span>
+    <span class="sub">芯片参考手册</span>
+  </a>
+  <div class="navlinks"><a href="index.html">芯片总览</a><a href="clock.html">时钟系统</a><a href="gpio.html">GPIO 与 IO 复用</a><a href="irq.html">中断系统</a><a href="uart.html" class=active>UART 串口</a><a href="spi.html">SPI 总线</a><a href="iic.html">IIC 总线</a><a href="timer.html">定时器</a><a href="mcpwm.html">MCPWM</a><a href="adc.html">ADC 采样</a><a href="audio.html">音频系统</a><a href="usb.html">USB 设备</a><a href="sdio.html">SD / TF 卡</a><a href="sfc.html">SPI Flash 控制器</a><a href="power.html">电源管理</a><a href="dma-sec.html">DMA 与安全加速器</a><a href="misc.html">其他外设</a></div>
+</div></nav>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="crumb">CHAPTER 5</div>
+    <h1>UART 串口</h1>
+    <p>3 路异步串口：硬件环形 DMA 接收、DMA 发送、红外模式——对应 JL_UART0-2（0x1E2000 起）。</p>
+  </header>
+
+  <div class="layout">
+    <main class="main">
+<section class="card" id="ov">
+<h2 id="ov">概述</h2>
+
+<p>AC6956C 内置 <b>3 路异步串口</b>（UART0/1/2，寄存器结构相同），特点是接收方向为
+<b>硬件环形 DMA 缓冲</b>：CPU 只需查询 <code>HRXCNT</code> 硬件接收计数即可无丢包地
+收取流式数据，非常适合调试控制台与外接模块通信。发送方向支持单字节（BUF）与
+DMA 描述符（TXADR/TXCNT）两种方式。</p>
+<div class="grid g4"><div class="kpi"><div class="v">3 路</div><div class="k">UART0 / 1 / 2</div></div><div class="kpi"><div class="v">PLL48M</div><div class="k">默认时钟源（主频无关）</div></div><div class="kpi"><div class="v">环形 RX</div><div class="k">硬件 DMA 接收缓冲</div></div><div class="kpi"><div class="v">18-20</div><div class="k">中断号</div></div></div>
+
+<div class="fig"><svg viewBox="0 0 900 330" xmlns="http://www.w3.org/2000/svg" role="img"><defs><marker id="arw" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#5b6b8c"/></marker></defs><rect x="30" y="40" width="170" height="60" rx="9" fill="#f4ebfa" stroke="#7c2d92" stroke-width="1.4"/><text x="115.0" y="58.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="800" fill="#14264d">时钟源</text><text x="115.0" y="74.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">CLK_CON1[11:10]</text><text x="115.0" y="90.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">默认 PLL48M</text><rect x="30" y="170" width="170" height="60" rx="9" fill="#e6f5ec" stroke="#1e7f4f" stroke-width="1.4"/><text x="115.0" y="196.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="800" fill="#14264d">波特率发生器</text><text x="115.0" y="212.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">BAUD（写_only）</text><line x1="115" y1="100" x2="115" y2="170" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><rect x="300" y="40" width="170" height="70" rx="9" fill="#e6f5ec" stroke="#1e7f4f" stroke-width="1.4"/><text x="385.0" y="63.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="800" fill="#14264d">发送移位器</text><text x="385.0" y="79.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">TX: TXADR/TXCNT</text><text x="385.0" y="95.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">DMA 逐包发送</text><rect x="300" y="170" width="170" height="70" rx="9" fill="#e6f5ec" stroke="#1e7f4f" stroke-width="1.4"/><text x="385.0" y="193.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="800" fill="#14264d">接收环形缓冲</text><text x="385.0" y="209.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">RXSADR/RXEADR/RXCNT</text><text x="385.0" y="225.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">硬件计数 HRXCNT</text><line x1="200" y1="70" x2="300" y2="70" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><line x1="200" y1="195" x2="300" y2="200" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><rect x="600" y="100" width="190" height="70" rx="9" fill="#dbe4f5" stroke="#14264d" stroke-width="1.4"/><text x="695.0" y="123.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="800" fill="#14264d">TX/RX 引脚</text><text x="695.0" y="139.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">IO 复用 CH0-CH2</text><text x="695.0" y="155.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">（OTCNT 输出触发）</text><line x1="470" y1="75" x2="600" y2="125" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><line x1="600" y1="155" x2="470" y2="200" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/><rect x="600" y="230" width="190" height="60" rx="9" fill="#eef1f7" stroke="#8a94a6" stroke-width="1.4"/><text x="695.0" y="256.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="12" font-weight="800" fill="#14264d">IRQ_UART0-2</text><text x="695.0" y="272.2" text-anchor="middle" font-family="Segoe UI,PingFang SC,Microsoft YaHei,sans-serif" font-size="10.5" font-weight="500" fill="#4a5568">18 / 19 / 20</text><line x1="560" y1="240" x2="600" y2="255" stroke="#5b6b8c" stroke-width="1.6" marker-end="url(#arw)"/></svg><div class="figcap">图 5-1  UART 结构框图</div></div>
+
+
+</section>
+<section class="card" id="regs">
+<h2 id="regs">寄存器（JL_UART0 @ 0x1E2000，UART1/2 = +0x100 / +0x200）</h2>
+<div class="tbl-wrap"><table class="tbl "><thead><tr><th>偏移</th><th>寄存器</th><th>属性</th><th>说明</th></tr></thead><tbody>
+<tr><td><code class="rg">0x00</code></td><td><code class="rg">CON0</code></td><td><span class="rw rw">RW</span></td><td>控制 0（使能/模式，SDK 驱动管理）</td></tr>
+<tr><td><code class="rg">0x04</code></td><td><code class="rg">CON1</code></td><td><span class="rw rw">RW</span></td><td>控制 1（红外/IR 模式等）</td></tr>
+<tr><td><code class="rg">0x08</code></td><td><code class="rg">BAUD</code></td><td><span class="rw wo">WO</span></td><td>波特率分频（驱动按时钟源自动计算）</td></tr>
+<tr><td><code class="rg">0x0C</code></td><td><code class="rg">BUF</code></td><td><span class="rw rw">RW</span></td><td>发送/接收数据字节（轮询模式）</td></tr>
+<tr><td><code class="rg">0x10</code></td><td><code class="rg">OTCNT</code></td><td><span class="rw rw">RW</span></td><td>输出触发计数</td></tr>
+<tr><td><code class="rg">0x14</code></td><td><code class="rg">TXADR</code></td><td><span class="rw rw">RW</span></td><td>发送 DMA 缓冲地址</td></tr>
+<tr><td><code class="rg">0x18</code></td><td><code class="rg">TXCNT</code></td><td><span class="rw wo">WO</span></td><td>发送字节数（写入即启动 DMA 发送）</td></tr>
+<tr><td><code class="rg">0x1C</code></td><td><code class="rg">RXSADR</code></td><td><span class="rw rw">RW</span></td><td>接收环形缓冲起始地址</td></tr>
+<tr><td><code class="rg">0x20</code></td><td><code class="rg">RXEADR</code></td><td><span class="rw rw">RW</span></td><td>接收环形缓冲结束地址</td></tr>
+<tr><td><code class="rg">0x24</code></td><td><code class="rg">RXCNT</code></td><td><span class="rw rw">RW</span></td><td>接收控制</td></tr>
+<tr><td><code class="rg">0x28</code></td><td><code class="rg">HRXCNT</code></td><td><span class="rw ro">RO</span></td><td>硬件接收计数（读取后自动清零）</td></tr>
+</tbody></table></div>
+
+</section>
+<div class="note">SDK 未公开 CON0/CON1 的逐位定义（在闭源驱动库内），应用层应通过 <code>uart_init()</code> / 设备层 API 配置，不要直接写控制位。</div>
+<section class="card" id="use">
+<h2 id="use">使用方法</h2>
+<pre><code>#include &quot;asm/uart.h&quot;
+
+/* 平台数据（board 板级文件中） */
+UART0_PLATFORM_DATA_BEGIN(uart0_data);
+    .baudrate = 1000000,            /* 调试串口 1M */
+    .tx_pin   = IO_PORT_DP,         /* 本机: DP/DM 复用作 TX/RX */
+    .rx_pin   = IO_PORT_DM,
+    .clk_src  = UART_CLK_SRC_PLL48M,
+UART0_PLATFORM_END();
+
+uart_init(&amp;uart0_data);
+
+/* 常用接口（include_lib/driver/device/uart.h） */
+uart_send_data(&amp;uart0_dev, buf, len);
+uart_recv_data(&amp;uart0_dev, buf, len);   /* 从环形缓冲取走数据 */
+
+/* 典型调试口: printf 走 UART0 */</code></pre>
+
+</section>
+<div class="tip">本机实践：充电头供电场景下 USB 会抢占 DP/DM，用「按住任意键上电」进入日志模式可禁用 OTG、把 DP/DM 让给 UART0 做全程日志。</div>
+
+      <div class="footer">
+        <a href="irq.html">← 中断系统</a>
+        <span class="src">依据 SDK 头文件逆向整理 · JieLi AC6956C (BR23) · 仅供开发参考</span>
+        <a href="spi.html">SPI 总线 →</a>
+      </div>
+    </main>
+    <aside class="toc"><div class="t">本页目录</div><a href="#ov">概述</a><a href="#regs">寄存器（JL_UART0 @ 0x1E2000，UART1/2 = +0x100 / +0x200）</a><a href="#use">使用方法</a></aside>
+  </div>
+</div>
+</body>
+</html>
