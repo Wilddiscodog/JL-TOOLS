@@ -369,7 +369,13 @@ namespace JlFlash.Flow
                 resp = new byte[16];
                 up.Item2.Execute(cdb, null, resp);
                 _log($"      raw response: {BitConverter.ToString(resp)}");
-                key = ld.ReadChipKey(0xAC6900); // decoded via MengLi
+                // key = MengLi-CrcCipher over raw[7],[6] (big-endian pair at offset 6).
+                // NOTE: the loader-path ld.ReadChipKey() parses its own CmdExec
+                // response at [5],[4] and yields a WRONG value (e.g. 0x7E2C);
+                // the raw capture is authoritative (0xB165 on the Y20 unit).
+                var bePair = new[] { resp[7], resp[6] };
+                var dec = MengLi.CrcCipher(bePair);
+                key = (ushort)(dec[0] | (dec[1] << 8));
             }
             return Tuple.Create(key, resp);
         }
