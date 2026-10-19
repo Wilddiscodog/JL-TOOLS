@@ -340,8 +340,22 @@ namespace JlFlash.Flow
         /// <summary>
         /// Download the loader, then read the chipkey (eFuse) via FC09.
         /// The key is MengLi-encrypted on the wire and decoded here.
+        /// Decodes the authoritative raw capture (key at raw[7],[6] BE);
+        /// the loader-path [5],[4] parse yields a wrong value (see note below).
         /// </summary>
         public Tuple<ushort, byte[]> ReadChipKey(string devicePath)
+        {
+            return ReadChipKeyImpl(devicePath, resetAfter: false);
+        }
+
+        /// <summary>Same as ReadChipKey but reboots the chip into its
+        /// firmware afterwards (FC0C), leaving UBOOT loader mode.</summary>
+        public Tuple<ushort, byte[]> ReadChipKeyAndReset(string devicePath)
+        {
+            return ReadChipKeyImpl(devicePath, resetAfter: true);
+        }
+
+        private Tuple<ushort, byte[]> ReadChipKeyImpl(string devicePath, bool resetAfter)
         {
             ushort key;
             byte[] resp;
@@ -351,7 +365,7 @@ namespace JlFlash.Flow
                 _log($"Device: {inquiry.Item1} / {inquiry.Item2} / {inquiry.Item3}");
 
                 var uboot = new UbootRom(dev);
-                _log("[1/3] Downloading wl82loader.bin into RAM ...");
+                _log("[1/3] Downloading loader into RAM ...");
                 DownloadLoader(uboot);
 
                 _log("[2/3] Jumping to loader ...");
@@ -376,6 +390,10 @@ namespace JlFlash.Flow
                 var bePair = new[] { resp[7], resp[6] };
                 var dec = MengLi.CrcCipher(bePair);
                 key = (ushort)(dec[0] | (dec[1] << 8));
+                if (resetAfter)
+                {
+                    try { ld.RunApp(1); _log("      chip reset (FC0C)."); } catch { }
+                }
             }
             return Tuple.Create(key, resp);
         }
