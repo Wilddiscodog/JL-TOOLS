@@ -1,258 +1,284 @@
-﻿using System;
+using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.Diagnostics;
 using JlFlash.Flow;
+using JlFlashGui;
 
 namespace JlFlashGui
 {
     public class MainForm : Form
     {
-        // ---- 设备区 ----
+        // ---- 顶部设备区 ----
         private Button _btnScan;
         private Button _btnKick;
-        private Button _btnStop;
         private Label _devInfo;
 
-        // ---- AC695N SRAM 运行区 ----
-        private TextBox _ramPayload;
-        private TextBox _ramAddr;
-        private TextBox _ramMailbox;
-        private TextBox _ramArg;
-        private ComboBox _ramCipher;
-        private Button _btnRamBrowse;
-        private Button _btnRunRam;
-        private TextBox _fwPath;
-        private Button _btnFwBrowse;
-        private Button _btnFlash23;
+        // ---- Tab 页控件 ----
+        // AC695N / BR23
+        private TextBox _brFwPath;
+        private TextBox _brDumpPath;
+        // AC791N / WL82
+        private TextBox _wlFwPath;
+        private TextBox _wlDumpPath;
+        private TextBox _wlPayload;
+        private TextBox _wlPayloadAddr;
+        // Key 工具
+        private TextBox _keyChipKey;
+        private TextBox _keyOutDir;
+        private TextBox _recryptToolsDir;
+        private TextBox _recryptKeyFile;
+        private CheckBox _ckRecrypt;
 
-        // ---- wl82 区（原有功能） ----
-        private TextBox _path;
-        private TextBox _payloadPath;
-        private TextBox _payloadAddr;
-        private Button _btnFlash;
-        private Button _btnRestore;
-        private Button _btnReadKey;
-        private Button _btnLoadRun;
-        private Button _btnWriteRam;
-        private Button _btnJump;
-        private Button _btnPayloadBrowse;
-
+        // ---- 日志 ----
         private TextBox _log;
-        private volatile bool _stop;
+
+        private readonly List<Button> _allButtons = new List<Button>();
         private volatile bool _busy;
 
-        private static readonly string DefaultRamPayload =
-            Path.Combine(@"J:\witerpaper\AC695N_Soundbox_SDK-master\SDK\apps\hello_ram", "hello_ram.bin");
+        private static readonly string DefaultBrFw =
+            @"J:\witerpaper\QQ-SDK\AC695N_SDK\SDK\cpu\br23\tools\download\standard\jl_isd.bin";
+        private static readonly string DefaultWlFw =
+            @"D:\fw-AC79_AIoT_SDK\cpu\wl82\tools\jl_isd.bin";
+        private static readonly string DefaultWlTools =
+            @"D:\fw-AC79_AIoT_SDK\cpu\wl82\tools";
+        private static readonly string DefaultDumpDir = @"J:\xiaolu-r2\device-flash-bin";
 
         public MainForm()
         {
-            Text = "JlFlash 上位机 - AC695N SRAM运行 / wl82 烧录调试";
-            Size = new Size(980, 720);
-            MinimumSize = new Size(860, 600);
+            Text = "JL-TOOLS 烧录上位机";
+            Size = new Size(1020, 780);
+            MinimumSize = new Size(920, 680);
             StartPosition = FormStartPosition.CenterScreen;
             Font = new Font("Microsoft YaHei UI", 9f);
 
-            var layout = new TableLayoutPanel
+            var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Padding = new Padding(10, 8, 10, 8) };
+            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 64));   // 头部
+            root.RowStyles.Add(new RowStyle(SizeType.AutoSize));       // 设备区
+            root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));   // Tab
+            root.RowStyles.Add(new RowStyle(SizeType.Percent, 42));    // 日志
+
+            root.Controls.Add(Header(), 0, 0);
+            root.Controls.Add(DeviceBar(), 0, 1);
+            root.Controls.Add(Tabs(), 0, 2);
+            _log = LogBox();
+            root.Controls.Add(_log, 0, 3);
+            Controls.Add(root);
+
+            Log("JL-TOOLS 上位机就绪。设备接 USB 后：UDISK 固件模式点「进入下载模式」，救砖/新固件直接短接 flash CS 插入（ROM UBOOT 会被自动识别）。");
+            Log("提示：AC7911 的芯片已烧 key（0x7DF1），固件必须 recrypt 加密烧录（AC791N 页「加密烧录」），默认流镜像无法启动。");
+        }
+
+        // ============================================================ UI 构造
+        private Control Header()
+        {
+            var p = new Panel
             {
                 Dock = DockStyle.Fill,
-                ColumnCount = 1,
-                RowCount = 4,
+                BackColor = Color.FromArgb(21, 38, 77),
+                Padding = new Padding(16, 10, 16, 8),
             };
-            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            p.Paint += (s, e) =>
+            {
+                using (var b = new System.Drawing.Drawing2D.LinearGradientBrush(p.ClientRectangle,
+                    Color.FromArgb(20, 38, 77), Color.FromArgb(36, 86, 214), 20f))
+                    e.Graphics.FillRectangle(b, p.ClientRectangle);
+            };
+            p.Controls.Add(new Label
+            {
+                Text = "JL-TOOLS  杰理芯片烧录上位机      AC695N (BR23) · AC791N (WL82)",
+                ForeColor = Color.White,
+                Font = new Font("Microsoft YaHei UI", 12f, FontStyle.Bold),
+                AutoSize = true,
+                Location = new Point(16, 12),
+            });
+            return p;
+        }
 
-            // ================= 设备区 =================
-            var grpDev = new GroupBox { Text = "设备", Dock = DockStyle.Top, Height = 62, Padding = new Padding(8) };
-            var devRow = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight, WrapContents = false };
+        private Control DeviceBar()
+        {
+            var grp = NewGroup("设备", 56);
+            var row = Row(grp);
 
-            _btnScan = MkBtn("扫描设备", 100);
+            _btnScan = MkBtn("扫描设备", 96);
             _btnScan.Click += (s, e) => Run(() =>
             {
                 Log("扫描中 ...");
                 var devs = FlashFlow.FindDevices();
-                Log(devs.Count == 0 ? "未找到 JieLi 设备（板子未接 / 未进下载模式 / 固件 U 盘模式）"
+                Log(devs.Count == 0 ? "未找到 JieLi 设备（板子未接 / 固件无 U 盘功能时请用 CS 短接进 ROM 模式）"
                     : "找到:\n" + string.Join("\n", devs));
             });
 
-            _btnKick = MkBtn("进入下载模式 (kick)", 150);
+            _btnKick = MkBtn("进入下载模式", 120);
             _btnKick.Click += (s, e) => Run(() =>
             {
-                Log("尝试进入 UBOOT 下载模式（已有 UBOOT 直接确认，否则对固件 U 盘发 0xFB 软升级命令）...");
-                var dev = SramRun.EnterDownloadMode(NewFlow(), Log, 15000);
-                Log(dev != null ? $"UBOOT 设备就绪: {dev}" : "失败：未出现 UBOOT 设备（试试断电→插数据线→上电，或按住按键复位）");
+                Log("尝试进入 UBOOT 下载模式（UDISK 固件发 0xFB；否则请用 CS 短接救砖）...");
+                var dev = SramRun.EnterDownloadMode(NewFlow(), Log, 20000);
+                Log(dev != null ? $"UBOOT 设备就绪: {dev}" : "失败：未出现 UBOOT 设备");
             });
 
-            _btnStop = MkBtn("停止", 70);
-            _btnStop.Enabled = false;
-            _btnStop.Click += (s, e) => _stop = true;
-
+            row.Controls.Add(_btnScan);
+            row.Controls.Add(_btnKick);
+            row.Controls.Add(MkLbl("状态:"));
             _devInfo = MkLbl("（未扫描）");
+            _devInfo.ForeColor = Color.FromArgb(30, 90, 190);
+            row.Controls.Add(_devInfo);
+            return grp;
+        }
 
-            devRow.Controls.Add(_btnScan);
-            devRow.Controls.Add(_btnKick);
-            devRow.Controls.Add(_btnStop);
-            devRow.Controls.Add(MkLbl("  "));
-            devRow.Controls.Add(_devInfo);
-            grpDev.Controls.Add(devRow);
+        private Control Tabs()
+        {
+            var tabs = new TabControl { Dock = DockStyle.Fill };
+            tabs.TabPages.Add(TabBr23());
+            tabs.TabPages.Add(TabWl82());
+            tabs.TabPages.Add(TabKeyTools());
+            return tabs;
+        }
 
-            // ================= AC695N SRAM 运行区 =================
-            var grpRam = new GroupBox
+        // ---------------------------------------------------------- AC695N
+        private TabPage TabBr23()
+        {
+            var page = new TabPage(" AC695N · BR23 (词易帮 Y20) ") { Padding = new Padding(10) };
+            var col = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, AutoSize = true };
+            col.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            col.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            col.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+            // -- 固件烧录（raw 默认流） --
+            var g1 = NewGroup("固件烧录（JlFlash 裸写，默认流镜像）", 62);
+            var r1 = Row(g1);
+            _brFwPath = new TextBox { Width = 520, Text = File.Exists(DefaultBrFw) ? DefaultBrFw : "" };
+            r1.Controls.Add(MkLbl("镜像:"));
+            r1.Controls.Add(_brFwPath);
+            var bBrowse = MkBtn("浏览...", 70);
+            bBrowse.Click += (s, e) => _brFwPath.Text = PickFile(_brFwPath.Text) ?? _brFwPath.Text;
+            r1.Controls.Add(bBrowse);
+            var bFlash = PrimaryBtn("烧录到 FLASH", 130);
+            bFlash.Click += (s, e) =>
             {
-                Text = "AC695N SRAM 运行 / 固件烧录（BR23）",
-                Dock = DockStyle.Top,
-                Height = 148,
-                Padding = new Padding(8),
-            };
-            var ramRows = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, AutoSize = true };
-            var ramRow1 = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, Height = 36 };
-            var ramRow2 = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, Height = 36 };
-
-            _ramPayload = new TextBox { Width = 480, Text = DefaultRamPayload };
-            _btnRamBrowse = MkBtn("浏览...", 60);
-            _btnRamBrowse.Click += (s, e) =>
-            {
-                using (var d = new OpenFileDialog())
-                {
-                    d.Filter = "bin|*.bin|all|*.*";
-                    if (File.Exists(_ramPayload.Text)) d.InitialDirectory = Path.GetDirectoryName(_ramPayload.Text);
-                    if (d.ShowDialog() == DialogResult.OK) _ramPayload.Text = d.FileName;
-                }
-            };
-
-            ramRow1.Controls.Add(MkLbl("载荷:"));
-            ramRow1.Controls.Add(_ramPayload);
-            ramRow1.Controls.Add(_btnRamBrowse);
-            ramRow1.Controls.Add(MkLbl("  加载地址:"));
-            _ramAddr = new TextBox { Width = 76, Text = "10000" };
-            ramRow1.Controls.Add(_ramAddr);
-
-            _ramMailbox = new TextBox { Width = 76, Text = "2FC00" };
-            _ramArg = new TextBox { Width = 60, Text = "0" };
-            _ramCipher = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 70 };
-            _ramCipher.Items.AddRange(new object[] { "自动", "明文", "密文" });
-            _ramCipher.SelectedIndex = 0;
-
-            _btnRunRam = MkBtn("▶ SRAM 运行", 110);
-            _btnRunRam.BackColor = Color.FromArgb(215, 235, 255);
-            _btnRunRam.Click += (s, e) =>
-            {
-                string file = _ramPayload.Text.Trim();
-                if (!File.Exists(file)) { Log("找不到载荷文件: " + file); return; }
-                Run(() =>
-                {
-                    Log($"SRAM 运行: {file} ({new FileInfo(file).Length} B)，流程 = 探测线密 → FB06 写入 → FD07 校验 → FB08 跳转 → 读邮箱");
-                    var flow = NewFlow();
-                    string dev = SramRun.EnterDownloadMode(flow, Log, 20000);
-                    SramRun.RunPayload(dev, File.ReadAllBytes(file), new SramRun.Options
-                    {
-                        LoadAddr = ParseHex(_ramAddr.Text, SramRun.PayloadAddrDefault),
-                        Mailbox = ParseHex(_ramMailbox.Text, SramRun.MailboxAddrDefault),
-                        JumpArg = (ushort)ParseHex(_ramArg.Text, 0),
-                        ForcedEnc = _ramCipher.SelectedIndex == 1 ? -1 : _ramCipher.SelectedIndex == 2 ? 1 : 0,
-                        NoVerify = false,
-                    }, Log);
-                    Log("完成。FLASH 未被修改。断电重新上电即恢复原固件。");
-                });
-            };
-
-            ramRow2.Controls.Add(MkLbl("邮箱地址:"));
-            ramRow2.Controls.Add(_ramMailbox);
-            ramRow2.Controls.Add(MkLbl("  跳转参数(arg):"));
-            ramRow2.Controls.Add(_ramArg);
-            ramRow2.Controls.Add(MkLbl("  线密模式:"));
-            ramRow2.Controls.Add(_ramCipher);
-            ramRow2.Controls.Add(MkLbl("  "));
-            ramRow2.Controls.Add(_btnRunRam);
-            ramRow2.Controls.Add(MkLbl("  提示: 板子断电→插数据线→上电，再点本按钮即可"));
-
-            // ---- 固件烧录（BR23, br23loader@0x12000, 直接擦写 FLASH）----
-            var ramRow3 = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, Height = 36 };
-            _fwPath = new TextBox { Width = 480, Text = @"J:\witerpaper\AC695N_Soundbox_SDK-master\SDK\cpur23	ools\download\standard\jl_isd.bin" };
-            _btnFwBrowse = MkBtn("浏览...", 60);
-            _btnFwBrowse.Click += (s, e) =>
-            {
-                using (var d = new OpenFileDialog())
-                {
-                    d.Filter = "bin|*.bin|all|*.*";
-                    if (File.Exists(_fwPath.Text)) d.InitialDirectory = Path.GetDirectoryName(_fwPath.Text);
-                    if (d.ShowDialog() == DialogResult.OK) _fwPath.Text = d.FileName;
-                }
-            };
-            _btnFlash23 = MkBtn("烧录到 FLASH", 120);
-            _btnFlash23.BackColor = Color.FromArgb(255, 230, 220);
-            _btnFlash23.Click += (s, e) =>
-            {
-                string file = _fwPath.Text.Trim();
+                string file = _brFwPath.Text.Trim();
                 if (!File.Exists(file)) { Log("找不到固件镜像: " + file); return; }
                 Run(() =>
                 {
-                    Log($"烧录 (BR23): {file} —— 将擦写芯片 FLASH，过程中请勿断电！");
+                    Log($"烧录 (BR23 默认流): {file} —— 将擦写芯片 FLASH，请勿断电！");
                     var flow = NewFlow();
                     flow.Chip = JlChip.Br23;
                     string dev = SramRun.EnterDownloadMode(flow, Log, 20000);
                     flow.FlashImage(dev, File.ReadAllBytes(file), verify: true);
                     Log("烧录完成，设备已复位。");
+                    Log("注意：Y20 (AC6956C) 实测默认流可启动；AC7911 则必须走 recrypt 加密烧录。");
                 });
             };
-            ramRow3.Controls.Add(MkLbl("固件:"));
-            ramRow3.Controls.Add(_fwPath);
-            ramRow3.Controls.Add(_btnFwBrowse);
-            ramRow3.Controls.Add(_btnFlash23);
-            ramRow3.Controls.Add(MkLbl("  jl_isd.bin（isd_download 打包产物）"));
+            r1.Controls.Add(bFlash);
+            col.Controls.Add(g1, 0, 0);
 
-            ramRows.Controls.Add(ramRow1, 0, 0);
-            ramRows.Controls.Add(ramRow2, 0, 1);
-            ramRows.Controls.Add(ramRow3, 0, 2);
-            grpRam.Controls.Add(ramRows);
-
-            // ================= wl82 区（原有功能） =================
-            var grpWl82 = new GroupBox
+            // -- 整片恢复 --
+            var g2 = NewGroup("整片恢复（写入完整 dump）", 62);
+            var r2 = Row(g2);
+            _brDumpPath = new TextBox { Width = 520 };
+            r2.Controls.Add(MkLbl("dump:"));
+            r2.Controls.Add(_brDumpPath);
+            var bDump = MkBtn("浏览...", 70);
+            bDump.Click += (s, e) => _brDumpPath.Text = PickFile(_brDumpPath.Text, DefaultDumpDir) ?? _brDumpPath.Text;
+            r2.Controls.Add(bDump);
+            var bRestore = MkBtn("整片恢复", 130);
+            bRestore.Click += (s, e) =>
             {
-                Text = "wl82 (AC791N) 烧录 / 调试 —— 原有功能",
-                Dock = DockStyle.Top,
-                Height = 104,
-                Padding = new Padding(8),
-            };
-            var wlRows = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, AutoSize = true };
-            var wlRow1 = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, Height = 36 };
-            var wlRow2 = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, Height = 36 };
-
-            _path = new TextBox { Width = 400, Text = @"D:\fw-AC79_AIoT_SDK\cpu\wl82\tools\jl_isd.bin" };
-            var browse = MkBtn("浏览...", 60);
-            browse.Click += (s, e) =>
-            {
-                using (var d = new OpenFileDialog())
+                string file = _brDumpPath.Text.Trim();
+                if (!File.Exists(file)) { Log("找不到 dump 文件: " + file); return; }
+                Run(() =>
                 {
-                    d.Filter = "bin|*.bin|all|*.*";
-                    if (d.ShowDialog() == DialogResult.OK) _path.Text = d.FileName;
-                }
+                    Log($"整片恢复: {file} —— 需要几分钟，请勿断电！");
+                    var flow = NewFlow();
+                    flow.Chip = JlChip.Br23;
+                    string dev = SramRun.EnterDownloadMode(flow, Log, 20000);
+                    flow.WriteRaw(dev, File.ReadAllBytes(file), 0, verify: true);
+                    Log("恢复完成，设备已复位。");
+                });
             };
+            r2.Controls.Add(bRestore);
+            col.Controls.Add(g2, 0, 1);
 
-            _btnFlash = MkBtn("烧录 jl_isd.bin", 120);
-            _btnFlash.Click += (s, e) =>
+            // -- ChipKey --
+            var g3 = NewGroup("eFuse ChipKey", 62);
+            var r3 = Row(g3);
+            var bKey = MkBtn("读取 ChipKey", 120);
+            bKey.Click += (s, e) => Run(() =>
             {
-                string file = _path.Text.Trim();
+                Log("读取 ChipKey（FC09，raw[6..7] 解码）...");
+                var flow = NewFlow();
+                flow.Chip = JlChip.Br23;
+                string dev = SramRun.EnterDownloadMode(flow, Log, 20000);
+                var r = flow.ReadChipKeyAndReset(dev);
+                Log($"ChipKey (解码): 0x{r.Item1:X4}");
+                Log("raw: " + BitConverter.ToString(r.Item2));
+                Log("可用 Key 工具页生成对应的 0xXXXX.key 文件。");
+            });
+            r3.Controls.Add(bKey);
+            r3.Controls.Add(MkLbl("Y20 实测 = 0xB165；AC7911 = 0x7DF1"));
+            col.Controls.Add(g3, 0, 2);
+
+            page.Controls.Add(col);
+            return page;
+        }
+
+        // ---------------------------------------------------------- AC791N
+        private TabPage TabWl82()
+        {
+            var page = new TabPage(" AC791N · WL82 (xiaolu-r2) ") { Padding = new Padding(10) };
+            var col = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, AutoSize = true };
+            col.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            col.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            col.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            col.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+            // -- 固件烧录（raw 默认流——仅适用于不含 recrypt 需求的芯片/场景） --
+            var g1 = NewGroup("固件烧录（JlFlash 裸写，默认流镜像——本芯片须 recrypt 才能启动，见「加密烧录」页）", 62);
+            var r1 = Row(g1);
+            _wlFwPath = new TextBox { Width = 520, Text = File.Exists(DefaultWlFw) ? DefaultWlFw : "" };
+            r1.Controls.Add(MkLbl("镜像:"));
+            r1.Controls.Add(_wlFwPath);
+            var bBrowse = MkBtn("浏览...", 70);
+            bBrowse.Click += (s, e) => _wlFwPath.Text = PickFile(_wlFwPath.Text) ?? _wlFwPath.Text;
+            r1.Controls.Add(bBrowse);
+            var bFlash = MkBtn("烧录到 FLASH", 130);
+            bFlash.Click += (s, e) =>
+            {
+                string file = _wlFwPath.Text.Trim();
                 if (!File.Exists(file)) { Log("找不到镜像文件: " + file); return; }
                 Run(() =>
                 {
+                    Log($"烧录 (WL82 裸写默认流): {file} —— 请勿断电！");
+                    Log("警告：本芯片已烧 key（0x7DF1），默认流镜像烧入后无法启动；正常烧录请用「加密烧录」页。");
                     var flow = NewFlow();
-                    string dev = flow.WaitForDevice(5000);
-                    Log("设备: " + dev);
-                    flow.FlashImage(dev, File.ReadAllBytes(file));
+                    string dev = SramRun.EnterDownloadMode(flow, Log, 20000);
+                    flow.FlashImage(dev, File.ReadAllBytes(file), verify: true);
+                    Log("烧录完成，设备已复位。");
                 });
             };
+            r1.Controls.Add(bFlash);
+            col.Controls.Add(g1, 0, 0);
 
-            _btnRestore = MkBtn("恢复原厂 dump", 120);
-            _btnRestore.Click += (s, e) =>
+            // -- 整片恢复 --
+            var g2 = NewGroup("整片恢复（写入完整 dump，救砖）", 62);
+            var r2 = Row(g2);
+            _wlDumpPath = new TextBox { Width = 520 };
+            r2.Controls.Add(MkLbl("dump:"));
+            r2.Controls.Add(_wlDumpPath);
+            var bDump = MkBtn("浏览...", 70);
+            bDump.Click += (s, e) => _wlDumpPath.Text = PickFile(_wlDumpPath.Text, DefaultDumpDir) ?? _wlDumpPath.Text;
+            r2.Controls.Add(bDump);
+            var bRestore = MkBtn("整片恢复", 130);
+            bRestore.Click += (s, e) =>
             {
-                string file = PickFile();     // must run on the UI (STA) thread
-                if (file == null) return;
+                string file = _wlDumpPath.Text.Trim();
+                if (!File.Exists(file)) { Log("找不到 dump 文件: " + file); return; }
                 Run(() =>
                 {
                     var flow = NewFlow();
@@ -260,104 +286,253 @@ namespace JlFlashGui
                     Log("设备: " + dev);
                     Log("整片恢复，需要几分钟，请勿断电 ...");
                     flow.WriteRaw(dev, File.ReadAllBytes(file), 0, verify: true);
+                    Log("恢复完成，设备已复位。");
                 });
             };
+            r2.Controls.Add(bRestore);
+            col.Controls.Add(g2, 0, 1);
 
-            _btnReadKey = MkBtn("读 ChipKey", 100);
-            _btnReadKey.Click += (s, e) => Run(() =>
+            // -- SRAM 运行 --
+            var g3 = NewGroup("SRAM 运行（写 RAM 并跳转，FLASH 不受影响）", 96);
+            var rows = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, AutoSize = true };
+            var rr1 = Row(rows);
+            _wlPayload = new TextBox { Width = 430, Text = "loop.bin" };
+            rr1.Controls.Add(MkLbl("载荷:"));
+            rr1.Controls.Add(_wlPayload);
+            var bpb = MkBtn("浏览...", 70);
+            bpb.Click += (s, e) => _wlPayload.Text = PickFile(_wlPayload.Text) ?? _wlPayload.Text;
+            rr1.Controls.Add(bpb);
+            rr1.Controls.Add(MkLbl("  地址:"));
+            _wlPayloadAddr = new TextBox { Width = 84, Text = "1C40000" };
+            rr1.Controls.Add(_wlPayloadAddr);
+            var bLoad = PrimaryBtn("载入并运行", 110);
+            bLoad.Click += (s, e) =>
             {
-                var flow = NewFlow();
-                flow.Chip = JlChip.Br23;    /* AC695N: br23loader，默认 Wl82 在此芯片上跑不起来 */
-                string dev = flow.WaitForDevice(5000);
-                var r = flow.ReadChipKey(dev);
-                Log($"ChipKey (解码): 0x{r.Item1:X4}");
-                Log("raw: " + BitConverter.ToString(r.Item2));
-            });
-
-            wlRow1.Controls.Add(MkLbl("镜像:"));
-            wlRow1.Controls.Add(_path);
-            wlRow1.Controls.Add(browse);
-            wlRow1.Controls.Add(_btnFlash);
-            wlRow1.Controls.Add(_btnRestore);
-            wlRow1.Controls.Add(_btnReadKey);
-
-            _payloadPath = new TextBox { Width = 300, Text = "loop.bin" };
-            _btnPayloadBrowse = MkBtn("浏览...", 60);
-            _btnPayloadBrowse.Click += (s, e) =>
-            {
-                using (var d = new OpenFileDialog())
-                {
-                    d.Filter = "bin|*.bin|all|*.*";
-                    if (d.ShowDialog() == DialogResult.OK) _payloadPath.Text = d.FileName;
-                }
-            };
-            _payloadAddr = new TextBox { Width = 80, Text = "1C40000" };
-
-            _btnLoadRun = MkBtn("RAM运行 payload", 130);
-            _btnLoadRun.Click += (s, e) =>
-            {
-                string file = _payloadPath.Text.Trim();
+                string file = _wlPayload.Text.Trim();
                 if (!File.Exists(file)) { Log("找不到 payload 文件: " + file); return; }
                 Run(() =>
                 {
                     var flow = NewFlow();
                     string dev = flow.WaitForDevice(5000);
                     Log("设备: " + dev);
-                    LoadAndRun(flow, dev, file, ParseHex(_payloadAddr.Text, 0x1C40000));
+                    LoadAndRun(flow, dev, file, ParseHex(_wlPayloadAddr.Text, 0x1C40000));
                 });
             };
-
-            _btnWriteRam = MkBtn("仅写入RAM", 100);
-            _btnWriteRam.Click += (s, e) =>
+            rr1.Controls.Add(bLoad);
+            var rr2 = Row(rows);
+            var bWrite = MkBtn("仅写入 RAM", 110);
+            bWrite.Click += (s, e) =>
             {
-                string file = _payloadPath.Text.Trim();
+                string file = _wlPayload.Text.Trim();
                 if (!File.Exists(file)) { Log("找不到 payload 文件: " + file); return; }
                 Run(() =>
                 {
                     var flow = NewFlow();
                     string dev = flow.WaitForDevice(5000);
-                    Log("设备: " + dev);
-                    WritePayloadOnly(flow, dev, file, ParseHex(_payloadAddr.Text, 0x1C40000));
+                    WritePayloadOnly(flow, dev, file, ParseHex(_wlPayloadAddr.Text, 0x1C40000));
                 });
             };
-
-            _btnJump = MkBtn("仅跳转", 80);
-            _btnJump.Click += (s, e) =>
+            rr2.Controls.Add(bWrite);
+            var bJump = MkBtn("仅跳转", 90);
+            bJump.Click += (s, e) =>
             {
                 Run(() =>
                 {
-                    var flow = NewFlow();
-                    string dev = flow.WaitForDevice(5000);
-                    Log("设备: " + dev);
-                    uint addr = ParseHex(_payloadAddr.Text, 0x1C40000);
-                    var up = (Tuple<JlFlash.Protocol.LoaderV2, JlFlash.Transport.ScsiTransport>)
-                        typeof(FlashFlow).GetMethod("JumpToLoader", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
-                        .Invoke(flow, new object[] { new JlFlash.Protocol.UbootRom(new JlFlash.Transport.ScsiTransport(dev)), null });
+                    uint addr = ParseHex(_wlPayloadAddr.Text, 0x1C40000);
+                    var up = flow_EnterLoader();
                     Log($"jump to 0x{addr:X8} ...");
                     try { up.Item1.MemJump(addr); Log("jump returned"); }
                     catch (Exception ex) { Log("jump: " + ex.Message); }
                     Thread.Sleep(1500);
                     var still = FlashFlow.FindDevices();
-                    Log(still.Count == 0 ? "device GONE -> payload running" :
-                        "device still present: " + string.Join(",", still));
+                    Log(still.Count == 0 ? "设备已消失 -> payload 正在运行!" : "设备仍在: " + string.Join(",", still));
                 });
             };
+            rr2.Controls.Add(bJump);
+            rows.Controls.Add(rr1, 0, 0);
+            rows.Controls.Add(rr2, 0, 1);
+            g3.Controls.Add(rows);
+            col.Controls.Add(g3, 0, 2);
 
-            wlRow2.Controls.Add(MkLbl("payload:"));
-            wlRow2.Controls.Add(_payloadPath);
-            wlRow2.Controls.Add(_btnPayloadBrowse);
-            wlRow2.Controls.Add(MkLbl(" 地址:"));
-            wlRow2.Controls.Add(_payloadAddr);
-            wlRow2.Controls.Add(_btnLoadRun);
-            wlRow2.Controls.Add(_btnWriteRam);
-            wlRow2.Controls.Add(_btnJump);
+            // -- 读 ChipKey --
+            var g4 = NewGroup("eFuse ChipKey", 62);
+            var r4 = Row(g4);
+            var bKey = MkBtn("读取 ChipKey", 120);
+            bKey.Click += (s, e) => Run(() =>
+            {
+                var flow = NewFlow();
+                string dev = SramRun.EnterDownloadMode(flow, Log, 20000);
+                var r = flow.ReadChipKeyAndReset(dev);
+                Log($"ChipKey (解码): 0x{r.Item1:X4}");
+                Log("raw: " + BitConverter.ToString(r.Item2));
+                Log("本机实测 = 0x7DF1；可用 Key 工具页生成 0x7DF1.key 做 recrypt 烧录。");
+            });
+            r4.Controls.Add(bKey);
+            r4.Controls.Add(MkLbl("AC7911 实测 = 0x7DF1（ROM 强制解密，默认流镜像无法启动）"));
+            col.Controls.Add(g4, 0, 3);
 
-            wlRows.Controls.Add(wlRow1, 0, 0);
-            wlRows.Controls.Add(wlRow2, 0, 1);
-            grpWl82.Controls.Add(wlRows);
+            page.Controls.Add(col);
+            return page;
+        }
 
-            // ================= 日志 =================
-            _log = new TextBox
+        // ---------------------------------------------------------- Key 工具
+        private TabPage TabKeyTools()
+        {
+            var page = new TabPage(" 加密与 Key 工具 ") { Padding = new Padding(10) };
+            var col = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, AutoSize = true };
+            col.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            col.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            col.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+            // -- Key 文件生成 --
+            var g1 = NewGroup("Key 文件生成（格式已完全破解，可绕过 -use-chip-key 授权）", 96);
+            var rows = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, AutoSize = true };
+            var r1 = Row(rows);
+            r1.Controls.Add(MkLbl("ChipKey (4位hex):"));
+            _keyChipKey = new TextBox { Width = 110, Text = "7DF1" };
+            r1.Controls.Add(_keyChipKey);
+            r1.Controls.Add(MkLbl("  保存目录:"));
+            _keyOutDir = new TextBox { Width = 430, Text = @"D:\fw-AC79_AIoT_SDK\cpu\wl82\tools" };
+            r1.Controls.Add(_keyOutDir);
+            var bGen = PrimaryBtn("生成 key 文件", 130);
+            bGen.Click += (s, e) =>
+            {
+                try
+                {
+                    string key = _keyChipKey.Text.Trim();
+                    string path = KeyGen.Save(_keyOutDir.Text.Trim(), key);
+                    Log($"已生成 {path}");
+                    Log("内容: " + File.ReadAllText(path));
+                    Log("用法: isd_download ... -key " + Path.GetFileName(path) + " （对 chipkey 匹配的芯片做 recrypt 烧录）");
+                }
+                catch (Exception ex) { Log("生成失败: " + ex.Message); }
+            };
+            r1.Controls.Add(bGen);
+            rows.Controls.Add(r1, 0, 0);
+
+            var r2 = Row(rows);
+            r2.Controls.Add(MkLbl("已验证: 生成器复现 0xB165.key 逐字节一致；0x7DF1.key 已在 AC7911 实测通过 recrypt 烧录并启动。"));
+            rows.Controls.Add(r2, 0, 1);
+            g1.Controls.Add(rows);
+            col.Controls.Add(g1, 0, 0);
+
+            // -- recrypt 加密烧录（wl82） --
+            var g2 = NewGroup("recrypt 加密烧录（AC7911 专用：isd_download -key，固件写入时重加密为 chipkey 流）", 96);
+            var rows2 = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, AutoSize = true };
+            var s1 = Row(rows2);
+            s1.Controls.Add(MkLbl("工具目录(含 isd_config.ini/uboot.boot/app.bin):"));
+            s1.Controls.Add(MkLbl(""));
+            rows2.Controls.Add(s1, 0, 0);
+            var s2 = Row(rows2);
+            _recryptToolsDir = new TextBox { Width = 480, Text = File.Exists(DefaultWlTools + "\\isd_config.ini") ? DefaultWlTools : "" };
+            s2.Controls.Add(_recryptToolsDir);
+            var bTools = MkBtn("浏览...", 70);
+            bTools.Click += (s, e) =>
+            {
+                using (var d = new FolderBrowserDialog())
+                {
+                    if (Directory.Exists(_recryptToolsDir.Text)) d.SelectedPath = _recryptToolsDir.Text;
+                    if (d.ShowDialog() == DialogResult.OK) _recryptToolsDir.Text = d.SelectedPath;
+                }
+            };
+            s2.Controls.Add(bTools);
+            rows2.Controls.Add(s2, 0, 1);
+            var s3 = Row(rows2);
+            s3.Controls.Add(MkLbl("key 文件:"));
+            _recryptKeyFile = new TextBox { Width = 300, Text = @"D:\fw-AC79_AIoT_SDK\cpu\wl82\tools\0x7DF1.key" };
+            s3.Controls.Add(_recryptKeyFile);
+            var bKeyF = MkBtn("浏览...", 70);
+            bKeyF.Click += (s, e) =>
+            {
+                using (var d = new OpenFileDialog())
+                {
+                    d.Filter = "key|*.key|all|*.*";
+                    if (File.Exists(_recryptKeyFile.Text)) d.InitialDirectory = Path.GetDirectoryName(_recryptKeyFile.Text);
+                    if (d.ShowDialog() == DialogResult.OK) _recryptKeyFile.Text = d.FileName;
+                }
+            };
+            s3.Controls.Add(bKeyF);
+            var bGo = PrimaryBtn("加密烧录 (recrypt)", 170);
+            bGo.Click += (s, e) => Run(() => RecryptFlash());
+            s3.Controls.Add(bGo);
+            rows2.Controls.Add(s3, 0, 2);
+            g2.Controls.Add(rows2);
+            col.Controls.Add(g2, 0, 1);
+
+            // -- 说明 --
+            var g3 = NewGroup("说明", 100);
+            g3.Controls.Add(new Label
+            {
+                Text = "① recrypt 原理：打包产物为默认流（key=0xFFFF）加密；烧录时 UBOOT 用 key 文件把固件重加密为 chipkey 流写入。\n" +
+                       "② 本机 (AC7911) ROM 强制 eFuse 解密：默认流镜像无法启动，必须走本页 recrypt 烧录（已实测闭环）。\n" +
+                       "③ Y20 (AC6956C) 无此强制，默认流 JlFlash 裸写即可启动（两平台 ROM 行为不同）。\n" +
+                       "④ 前置条件：设备进 UBOOT 下载模式（UDISK 点「进入下载模式」；变砖/无 U 盘时 CS 短接救砖）。",
+                Dock = DockStyle.Fill,
+                Font = new Font("Microsoft YaHei UI", 9f),
+                ForeColor = Color.FromArgb(60, 70, 90),
+            });
+            col.Controls.Add(g3, 0, 2);
+
+            page.Controls.Add(col);
+            return page;
+        }
+
+        // ---------------------------------------------------------- recrypt 烧录
+        private void RecryptFlash()
+        {
+            string tools = _recryptToolsDir.Text.Trim();
+            string key = _recryptKeyFile.Text.Trim();
+            var exe = Path.Combine(tools, "isd_download.exe");
+            var ini = Path.Combine(tools, "isd_config.ini");
+            var uboot = Path.Combine(tools, "uboot.boot");
+            var app = Path.Combine(tools, "app.bin");
+
+            if (!File.Exists(exe)) { Log("找不到 " + exe); return; }
+            if (!File.Exists(ini)) { Log("找不到 " + ini); return; }
+            if (!File.Exists(uboot)) { Log("找不到 " + uboot); return; }
+            if (!File.Exists(app)) { Log("找不到 " + app + "（先在 SDK 编译出 app.bin 并放入工具目录）"); return; }
+            if (!File.Exists(key)) { Log("找不到 key 文件: " + key); return; }
+
+            Log($"recrypt 加密烧录: tools={tools}");
+            Log($"key={key} —— 将擦写芯片 FLASH，请勿断电！");
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = exe,
+                WorkingDirectory = tools,
+                Arguments = $"isd_config.ini -tonorflash -dev wl82 -boot 0x1c02000 -div1 -wait 3000 " +
+                            $"-uboot uboot.boot -app app.bin cfg_tool.bin -format all -key {Path.GetFileName(key)} -reboot 500",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+                StandardOutputEncoding = Encoding.GetEncoding("GBK"),
+                StandardErrorEncoding = Encoding.GetEncoding("GBK"),
+            };
+
+            using (var proc = Process.Start(psi))
+            {
+                proc.OutputDataReceived += (s, e) => { if (e.Data != null) Log(e.Data); };
+                proc.ErrorDataReceived += (s, e) => { if (e.Data != null) Log("[err] " + e.Data); };
+                proc.BeginOutputReadLine();
+                proc.BeginErrorReadLine();
+                proc.WaitForExit();
+                Log($"isd_download 退出码: {proc.ExitCode}");
+            }
+            Log("完成。若中途报 ERR_KEY/ERR_NODEVICE：确认设备已进 UBOOT 且 key 文件 chipkey 与芯片 eFuse 匹配。");
+        }
+
+        private Tuple<JlFlash.Protocol.LoaderV2, JlFlash.Transport.ScsiTransport> flow_EnterLoader()
+        {
+            var flow = NewFlow();
+            string dev = flow.WaitForDevice(5000);
+            return flow.EnterLoader(dev);
+        }
+
+        // ---------------------------------------------------------- 日志
+        private TextBox LogBox()
+        {
+            return new TextBox
             {
                 Dock = DockStyle.Fill,
                 Multiline = true,
@@ -365,27 +540,52 @@ namespace JlFlashGui
                 ScrollBars = ScrollBars.Vertical,
                 Font = new Font("Consolas", 9f),
                 WordWrap = false,
-                BackColor = Color.FromArgb(250, 250, 250),
+                BackColor = Color.FromArgb(15, 23, 41),
+                ForeColor = Color.FromArgb(219, 228, 245),
+                BorderStyle = BorderStyle.FixedSingle,
             };
+        }
 
-            layout.Controls.Add(grpDev, 0, 0);
-            layout.Controls.Add(grpRam, 0, 1);
-            layout.Controls.Add(grpWl82, 0, 2);
-            layout.Controls.Add(_log, 0, 3);
-            Controls.Add(layout);
+        // ---------------------------------------------------------- 小组件
+        private GroupBox NewGroup(string title, int height)
+        {
+            return new GroupBox { Text = title, Dock = DockStyle.Top, Height = height, Padding = new Padding(10, 6, 10, 6) };
+        }
 
-            Log("JlFlash GUI 就绪。AC695N SRAM 运行：板子断电→插数据线→上电 → 点「SRAM 运行」（会自动进下载模式）。");
-            Log("FLASH 全程不会被擦写；跑完断电重上电即回原固件。");
+        private FlowLayoutPanel Row(Control parent)
+        {
+            var row = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+                AutoSize = true,
+                Margin = new Padding(0, 3, 0, 3),
+            };
+            parent.Controls.Add(row);
+            return row;
         }
 
         private Button MkBtn(string text, int width)
         {
-            return new Button { Text = text, Width = width, Height = 30 };
+            var b = new Button { Text = text, Width = width, Height = 30 };
+            _allButtons.Add(b);
+            return b;
+        }
+
+        private Button PrimaryBtn(string text, int width)
+        {
+            var b = MkBtn(text, width);
+            b.BackColor = Color.FromArgb(36, 86, 214);
+            b.ForeColor = Color.White;
+            b.FlatStyle = FlatStyle.Flat;
+            b.FlatAppearance.BorderColor = Color.FromArgb(26, 64, 176);
+            return b;
         }
 
         private Label MkLbl(string text)
         {
-            return new Label { Text = text, AutoSize = true, Margin = new Padding(3, 8, 3, 3) };
+            return new Label { Text = text, AutoSize = true, Margin = new Padding(4, 8, 4, 0) };
         }
 
         private FlashFlow NewFlow()
@@ -393,12 +593,13 @@ namespace JlFlashGui
             return new FlashFlow(Log);
         }
 
-        private string PickFile()
+        private string PickFile(string cur, string initDir = null)
         {
             using (var d = new OpenFileDialog())
             {
-                d.Filter = "bin|*.bin|all|*.*";
-                d.InitialDirectory = @"J:\xiaolu-r2\device-flash-bin";
+                d.Filter = "bin|*.bin|key|*.key|all|*.*";
+                if (File.Exists(cur)) d.InitialDirectory = Path.GetDirectoryName(cur);
+                else if (initDir != null && Directory.Exists(initDir)) d.InitialDirectory = initDir;
                 return d.ShowDialog() == DialogResult.OK ? d.FileName : null;
             }
         }
@@ -406,7 +607,7 @@ namespace JlFlashGui
         private void Run(Action action)
         {
             if (_busy) { Log("当前有操作正在进行"); return; }
-            _busy = true; _stop = false;
+            _busy = true;
             SetButtons(false);
             Task.Run(() =>
             {
@@ -416,37 +617,20 @@ namespace JlFlashGui
             });
         }
 
-        /// <summary>FB06 write payload into RAM + FD07 verify. No jump. (wl82 loader path)</summary>
-        private void WritePayloadOnly(FlashFlow flow, string devPath, string file, uint addr)
+        private void SetButtons(bool enabled)
         {
-            var t = typeof(FlashFlow);
-            var dev = new JlFlash.Transport.ScsiTransport(devPath);
-            var uboot = new JlFlash.Protocol.UbootRom(dev);
-            t.GetMethod("DownloadLoader", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
-                .Invoke(flow, new object[] { uboot });
-            var up = (Tuple<JlFlash.Protocol.LoaderV2, JlFlash.Transport.ScsiTransport>)
-                t.GetMethod("JumpToLoader", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
-                .Invoke(flow, new object[] { uboot, null });
-            var ld = up.Item1;
+            foreach (var b in _allButtons)
+            {
+                var bb = b;
+                BeginInvoke((Action)(() => bb.Enabled = enabled));
+            }
+            BeginInvoke((Action)(() => _devInfo.Text = enabled ? _devInfo.Text : "操作中..."));
+        }
 
-            byte[] code = File.ReadAllBytes(file);
-            Log($"payload {file} ({code.Length} B) -> 0x{addr:X8}");
-            for (int off = 0; off < code.Length; off += 256)
-            {
-                int n = Math.Min(256, code.Length - off);
-                var chunk = new byte[n];
-                Array.Copy(code, off, chunk, 0, n);
-                ld.MemWrite(addr + (uint)off, chunk);
-            }
-            var back = new byte[code.Length];
-            for (int off = 0; off < code.Length; off += 256)
-            {
-                int n = Math.Min(256, code.Length - off);
-                var part = ld.MemRead(addr + (uint)off, n);
-                Array.Copy(part, 0, back, off, n);
-            }
-            bool same = back.SequenceEqual(code);
-            Log(same ? "write + verify OK (use jump button to execute)" : "ABORT: verify failed");
+        private void Log(string s)
+        {
+            if (_log.InvokeRequired) { BeginInvoke((Action)(() => Log(s))); return; }
+            _log.AppendText(DateTime.Now.ToString("HH:mm:ss ") + s.Replace("\n", "\r\n") + Environment.NewLine);
         }
 
         private static uint ParseHex(string s, uint def)
@@ -454,62 +638,61 @@ namespace JlFlashGui
             try { return Convert.ToUInt32(s.Trim(), 16); } catch { return def; }
         }
 
-        /// <summary>
-        /// Download a raw payload into SDRAM via the loader (FB06 as-is) and jump (FB08).
-        /// After the jump the device is expected to go silent if the payload runs forever.
-        /// </summary>
-        private void LoadAndRun(FlashFlow flow, string devPath, string file, uint addr)
+        /// <summary>FB06 写入 RAM + FD07 校验，不跳转。（wl82 loader 路径）</summary>
+        private void WritePayloadOnly(FlashFlow flow, string devPath, string file, uint addr)
         {
-            var t = typeof(FlashFlow);
-            var dev = new JlFlash.Transport.ScsiTransport(devPath);
-            var uboot = new JlFlash.Protocol.UbootRom(dev);
-            t.GetMethod("DownloadLoader", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
-                .Invoke(flow, new object[] { uboot });
-            var up = (Tuple<JlFlash.Protocol.LoaderV2, JlFlash.Transport.ScsiTransport>)
-                t.GetMethod("JumpToLoader", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
-                .Invoke(flow, new object[] { uboot, null });
+            var up = flow.EnterLoader(devPath);
             var ld = up.Item1;
-
             byte[] code = File.ReadAllBytes(file);
             Log($"payload {file} ({code.Length} B) -> 0x{addr:X8}");
             for (int off = 0; off < code.Length; off += 256)
             {
                 int n = Math.Min(256, code.Length - off);
-                var chunk = new byte[n];
-                Array.Copy(code, off, chunk, 0, n);
-                ld.MemWrite(addr + (uint)off, chunk);
+                ld.MemWrite(addr + (uint)off, Slice(code, off, n));
+            }
+            var back = new byte[code.Length];
+            for (int off = 0; off < code.Length; off += 256)
+            {
+                int n = Math.Min(256, code.Length - off);
+                Array.Copy(ld.MemRead(addr + (uint)off, n), 0, back, off, n);
+            }
+            Log(back.SequenceEqual(code) ? "写入 + 校验 OK（点「仅跳转」执行）" : "ABORT: 校验失败");
+        }
+
+        /// <summary>FB06 写入 SDRAM + 校验 + FB08 跳转。跳转后设备预期消失（载荷持续运行）。</summary>
+        private void LoadAndRun(FlashFlow flow, string devPath, string file, uint addr)
+        {
+            var up = flow.EnterLoader(devPath);
+            var ld = up.Item1;
+            byte[] code = File.ReadAllBytes(file);
+            Log($"payload {file} ({code.Length} B) -> 0x{addr:X8}");
+            for (int off = 0; off < code.Length; off += 256)
+            {
+                int n = Math.Min(256, code.Length - off);
+                ld.MemWrite(addr + (uint)off, Slice(code, off, n));
             }
             Log("written, verifying via FD07 ...");
             var back = new byte[code.Length];
             for (int off = 0; off < code.Length; off += 256)
             {
                 int n = Math.Min(256, code.Length - off);
-                var part = ld.MemRead(addr + (uint)off, n);
-                Array.Copy(part, 0, back, off, n);
+                Array.Copy(ld.MemRead(addr + (uint)off, n), 0, back, off, n);
             }
-            bool same = back.SequenceEqual(code);
-            Log("readback match: " + same);
-            if (!same) { Log("ABORT: memory not written correctly"); return; }
+            if (!back.SequenceEqual(code)) { Log("ABORT: memory not written correctly"); return; }
+            Log("readback match: True");
             Log($"jumping to 0x{addr:X8} (设备应该会消失) ...");
             try { ld.MemJump(addr); Log("jump command returned"); }
             catch (Exception ex) { Log("jump: " + ex.Message); }
             Thread.Sleep(1500);
             var still = FlashFlow.FindDevices();
-            Log(still.Count == 0 ? "设备已消失 -> payload 正在运行!" :
-                "设备仍在: " + string.Join(",", still));
+            Log(still.Count == 0 ? "设备已消失 -> payload 正在运行!" : "设备仍在: " + string.Join(",", still));
         }
 
-        private void SetButtons(bool enabled)
+        private static byte[] Slice(byte[] src, int off, int len)
         {
-            foreach (var b in new[] { _btnScan, _btnKick, _btnFlash, _btnRestore, _btnReadKey, _btnLoadRun, _btnWriteRam, _btnJump, _btnRunRam, _btnRamBrowse, _btnFlash23, _btnFwBrowse })
-                BeginInvoke((Action)(() => b.Enabled = enabled));
-            BeginInvoke((Action)(() => _btnStop.Enabled = !enabled));
-        }
-
-        private void Log(string s)
-        {
-            if (_log.InvokeRequired) { BeginInvoke((Action)(() => Log(s))); return; }
-            _log.AppendText(DateTime.Now.ToString("HH:mm:ss ") + s.Replace("\n", "\r\n") + Environment.NewLine);
+            var r = new byte[len];
+            Array.Copy(src, off, r, 0, len);
+            return r;
         }
     }
 }

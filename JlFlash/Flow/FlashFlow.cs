@@ -355,6 +355,48 @@ namespace JlFlash.Flow
             return ReadChipKeyImpl(devicePath, resetAfter: true);
         }
 
+        /// <summary>Download the loader and jump into it; returns the loader
+        /// protocol handle and its USB transport (for MemWrite/FlashRead ...).
+        /// Public helper so GUI code does not need reflection.</summary>
+        public Tuple<LoaderV2, ScsiTransport> EnterLoader(string devicePath)
+        {
+            var dev = new ScsiTransport(devicePath);
+            var inquiry = UbootRom.Inquiry(dev);
+            _log($"Device: {inquiry.Item1} / {inquiry.Item2} / {inquiry.Item3}");
+            var uboot = new UbootRom(dev);
+            DownloadLoader(uboot);
+            var up = JumpToLoader(uboot, null);
+            if (up == null) throw new IOException("Loader did not come up after jump");
+            return up;
+        }
+
+        /// <summary>Download loader and read a flash range via FD05
+        /// (device stays in loader mode; pair with RunApp to reset).</summary>
+        public byte[] ReadFlash(string devicePath, uint addr, int len)
+        {
+            using (var dev = new ScsiTransport(devicePath))
+            {
+                var inquiry = UbootRom.Inquiry(dev);
+                _log($"Device: {inquiry.Item1} / {inquiry.Item2} / {inquiry.Item3}");
+                var uboot = new UbootRom(dev);
+                DownloadLoader(uboot);
+                var up = JumpToLoader(uboot, null);
+                if (up == null) throw new IOException("Loader did not come up after jump");
+                var ld = up.Item1;
+                var online = ld.OnlineDevice();
+                _log($"      flash id=0x{online.Item2:X8}");
+                var buf = new byte[len];
+                for (int off = 0; off < len; off += 4096)
+                {
+                    int n = Math.Min(4096, len - off);
+                    var part = ld.FlashRead(addr + (uint)off, n);
+                    Array.Copy(part, 0, buf, off, n);
+                    if (((off >> 12) & 0xF) == 0) _log($"      read 0x{addr + (uint)off:X8}");
+                }
+                return buf;
+            }
+        }
+
         private Tuple<ushort, byte[]> ReadChipKeyImpl(string devicePath, bool resetAfter)
         {
             ushort key;
