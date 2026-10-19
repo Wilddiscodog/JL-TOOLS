@@ -50,8 +50,11 @@ namespace JlFlashGui
             @"D:\fw-AC79_AIoT_SDK\cpu\wl82\tools";
         private static readonly string DefaultDumpDir = @"J:\xiaolu-r2\device-flash-bin";
 
-        public MainForm()
+        private readonly int _initialTab;
+
+        public MainForm(int initialTab = 0)
         {
+            _initialTab = initialTab;
             Text = "JL-TOOLS 烧录上位机";
             Size = new Size(1020, 780);
             MinimumSize = new Size(920, 680);
@@ -103,7 +106,7 @@ namespace JlFlashGui
 
         private Control DeviceBar()
         {
-            var grp = NewGroup("设备", 56);
+            var grp = NewGroup("设备", 86);
             var row = Row(grp);
 
             _btnScan = MkBtn("扫描设备", 96);
@@ -138,13 +141,14 @@ namespace JlFlashGui
             tabs.TabPages.Add(TabBr23());
             tabs.TabPages.Add(TabWl82());
             tabs.TabPages.Add(TabKeyTools());
+            if (_initialTab > 0 && _initialTab < tabs.TabCount) tabs.SelectedIndex = _initialTab;
             return tabs;
         }
 
         // ---------------------------------------------------------- AC695N
         private TabPage TabBr23()
         {
-            var page = new TabPage(" AC695N · BR23 (词易帮 Y20) ") { Padding = new Padding(10) };
+            var page = new TabPage(" AC695N · BR23 ") { Padding = new Padding(10) };
             var col = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, AutoSize = true };
             col.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             col.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -293,7 +297,7 @@ namespace JlFlashGui
             col.Controls.Add(g2, 0, 1);
 
             // -- SRAM 运行 --
-            var g3 = NewGroup("SRAM 运行（写 RAM 并跳转，FLASH 不受影响）", 96);
+            var g3 = NewGroup("SRAM 运行（写 RAM 并跳转，FLASH 不受影响）", 126);
             var rows = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, AutoSize = true };
             var rr1 = Row(rows);
             _wlPayload = new TextBox { Width = 430, Text = "loop.bin" };
@@ -417,7 +421,7 @@ namespace JlFlashGui
             col.Controls.Add(g1, 0, 0);
 
             // -- recrypt 加密烧录（wl82） --
-            var g2 = NewGroup("recrypt 加密烧录（AC7911 专用：isd_download -key，固件写入时重加密为 chipkey 流）", 96);
+            var g2 = NewGroup("recrypt 加密烧录（AC7911 专用：isd_download -key，固件写入时重加密为 chipkey 流）", 196);
             var rows2 = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, AutoSize = true };
             var s1 = Row(rows2);
             s1.Controls.Add(MkLbl("工具目录(含 isd_config.ini/uboot.boot/app.bin):"));
@@ -549,7 +553,14 @@ namespace JlFlashGui
         // ---------------------------------------------------------- 小组件
         private GroupBox NewGroup(string title, int height)
         {
-            return new GroupBox { Text = title, Dock = DockStyle.Top, Height = height, Padding = new Padding(10, 6, 10, 6) };
+            return new GroupBox
+            {
+                Text = title,
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                MinimumSize = new Size(0, height),
+                Padding = new Padding(10, 6, 10, 6),
+            };
         }
 
         private FlowLayoutPanel Row(Control parent)
