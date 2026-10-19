@@ -267,6 +267,7 @@ namespace JlFlashGui
             _btnReadKey.Click += (s, e) => Run(() =>
             {
                 var flow = NewFlow();
+                flow.Chip = JlChip.Br23;    /* AC695N: br23loader，默认 Wl82 在此芯片上跑不起来 */
                 string dev = flow.WaitForDevice(5000);
                 var r = flow.ReadChipKey(dev);
                 Log($"ChipKey (解码): 0x{r.Item1:X4}");
