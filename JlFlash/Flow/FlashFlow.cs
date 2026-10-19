@@ -43,6 +43,15 @@ namespace JlFlash.Flow
 
         public FlashFlow(Action<string> log) { _log = log ?? delegate { }; }
 
+        private void SelectChipForDevice(Tuple<string, string, string> inquiry)
+        {
+            if (!inquiry.Item1.Equals("BR23", StringComparison.OrdinalIgnoreCase) || _chip == JlChip.Br23)
+                return;
+
+            Chip = JlChip.Br23;
+            _log("Detected BR23; selecting br23loader.bin at 0x00012000.");
+        }
+
         /// <summary>Enumerate candidate volumes and find one answering as a JieLi device.</summary>
         public static List<string> FindDevices()
         {
@@ -200,10 +209,11 @@ namespace JlFlash.Flow
             {
                 var inquiry = UbootRom.Inquiry(_cur);
                 _log($"Device: {inquiry.Item1} / {inquiry.Item2} / {inquiry.Item3}");
+                SelectChipForDevice(inquiry);
 
                 var uboot = new UbootRom(_cur);
 
-                _log("[1/5] Downloading wl82loader.bin into RAM ...");
+                _log($"[1/5] Downloading {(_chip == JlChip.Br23 ? "br23loader.bin" : "wl82loader.bin")} into RAM ...");
                 DownloadLoader(uboot);
 
                 _log("[2/5] Jumping to loader ...");
@@ -278,9 +288,10 @@ namespace JlFlash.Flow
             _cur = new ScsiTransport(devicePath);
             var inquiry = UbootRom.Inquiry(_cur);
             _log($"Device: {inquiry.Item1} / {inquiry.Item2} / {inquiry.Item3}");
+            SelectChipForDevice(inquiry);
 
             var uboot = new UbootRom(_cur);
-            _log("[1/4] Downloading wl82loader.bin into RAM ...");
+            _log($"[1/4] Downloading {(_chip == JlChip.Br23 ? "br23loader.bin" : "wl82loader.bin")} into RAM ...");
             DownloadLoader(uboot);
 
             _log("[2/4] Jumping to loader ...");
@@ -363,6 +374,7 @@ namespace JlFlash.Flow
             {
                 var inquiry = UbootRom.Inquiry(dev);
                 _log($"Device: {inquiry.Item1} / {inquiry.Item2} / {inquiry.Item3}");
+                SelectChipForDevice(inquiry);
 
                 var uboot = new UbootRom(dev);
                 _log("[1/3] Downloading loader into RAM ...");
