@@ -16,8 +16,6 @@ namespace JlFlash
         private readonly CheckBox _verify = new CheckBox();
         private readonly TextBox _log = new TextBox();
 
-        private const string DefaultImage = @"D:\fw-AC79_AIoT_SDK\cpu\wl82\tools\jl_isd.bin";
-
         public MainForm()
         {
             Text = "JlFlash";
@@ -80,8 +78,20 @@ namespace JlFlash
                 _imagePath.Width = Math.Max(80, _browse.Left - _imagePath.Left - 8);
             };
 
-            _imagePath.Text = File.Exists(LoadLastPath()) ? LoadLastPath()
-                : (File.Exists(DefaultImage) ? DefaultImage : "");
+            string lastPath = LoadLastPath();
+            _imagePath.Text = File.Exists(lastPath) ? lastPath : FindDefaultImage();
+        }
+
+        private static string FindDefaultImage()
+        {
+            for (var directory = new DirectoryInfo(AppContext.BaseDirectory);
+                 directory != null;
+                 directory = directory.Parent)
+            {
+                string candidate = Path.Combine(directory.FullName, "firmware", "jl_isd.bin");
+                if (File.Exists(candidate)) return candidate;
+            }
+            return "";
         }
 
         private static string LastPathFile
@@ -160,7 +170,7 @@ namespace JlFlash
                     byte[] bin = File.ReadAllBytes(path);
                     AppendLog("Image: " + path + " (" + bin.Length + " bytes)");
                     var flow = new FlashFlow(AppendLog);
-                    string dev = flow.WaitForDevice(8000);
+                    string dev = SramRun.EnterDownloadMode(flow, AppendLog, 15000);
                     AppendLog("Device: " + dev);
                     flow.FlashImage(dev, bin, verify);
                 });
